@@ -6,7 +6,7 @@ data:
   discovery.yml: |
     enable: "kubernetes" # "kubernetes" or "etcd"
     kubernetes:
-      namespace: default
+      namespace: openim
     etcd:
       rootDirectory: openim
       address: [ localhost:12379 ]
