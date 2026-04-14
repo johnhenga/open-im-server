@@ -12,6 +12,8 @@ spec:
       labels:
         app: openim-msgtransfer-server
     spec:
+      imagePullSecrets:
+        - name: dockerhub-regcred
       containers:
         - name: openim-msgtransfer-container
           image: openim/openim-msgtransfer:v3.8.3

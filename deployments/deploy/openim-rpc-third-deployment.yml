@@ -12,6 +12,8 @@ spec:
       labels:
         app: third-rpc-server
     spec:
+      imagePullSecrets:
+        - name: dockerhub-regcred
       containers:
         - name: third-rpc-server-container
           image: openim/openim-rpc-third:v3.8.3

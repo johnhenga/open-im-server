@@ -12,6 +12,8 @@ spec:
       labels:
         app: openim-api
     spec:
+      imagePullSecrets:
+        - name: dockerhub-regcred
       containers:
         - name: openim-api-container
           image: openim/openim-api:v3.8.3

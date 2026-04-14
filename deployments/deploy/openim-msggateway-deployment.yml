@@ -12,6 +12,8 @@ spec:
       labels:
         app: messagegateway-rpc-server
     spec:
+      imagePullSecrets:
+        - name: dockerhub-regcred
       containers:
         - name: openim-msggateway-container
           image: openim/openim-msggateway:v3.8.3
