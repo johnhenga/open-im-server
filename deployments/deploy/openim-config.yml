@@ -4,14 +4,14 @@ metadata:
   name: openim-config
 data:
   discovery.yml: |
-    enable: "kubernetes" # "kubernetes" or "etcd"
-    kubernetes:
-      namespace: default
+    enable: etcd
     etcd:
       rootDirectory: openim
-      address: [ localhost:12379 ]
+      address: [ etcd-client.openim.svc.cluster.local:2379 ]
       username: ''
       password: ''
+    kubernetes:
+      namespace: openim
 
     rpcService:
       user: user-rpc-service
@@ -375,7 +375,9 @@ data:
   share.yml: |
     secret: openIM123
 
-    imAdminUserID: ["imAdmin"]
+    imAdminUser:
+      userIDs: [imAdmin]
+      nicknames: [superAdmin]
 
     # 1: For Android, iOS, Windows, Mac, and web platforms, only one instance can be online at a time
     multiLogin:

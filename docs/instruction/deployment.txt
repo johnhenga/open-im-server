@@ -1,0 +1,3 @@
+When integrating with mobile, update the following
+- openim-config.yaml
+  - externalAddress: http://minio-service:10005 : mobile client requires endpoint to upload file/image

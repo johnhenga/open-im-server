@@ -4,7 +4,7 @@ metadata:
   name: mongo-statefulset
 spec:
   serviceName: "mongo"
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: mongo
@@ -13,6 +13,8 @@ spec:
       labels:
         app: mongo
     spec:
+      imagePullSecrets:
+        - name: dockerhub-regcred
       containers:
         - name: mongo
           image: mongo:7.0

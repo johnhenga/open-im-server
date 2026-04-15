@@ -12,6 +12,8 @@ spec:
       labels:
         app: push-rpc-server
     spec:
+      imagePullSecrets:
+        - name: dockerhub-regcred
       containers:
         - name: push-rpc-server-container
           image: openim/openim-push:v3.8.3

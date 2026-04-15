@@ -17,7 +17,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: default
-    namespace: default
+    namespace: openim
 roleRef:
   kind: ClusterRole
   name: service-reader

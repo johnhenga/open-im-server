@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: openim-crontask
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: crontask
@@ -12,12 +12,34 @@ spec:
       labels:
         app: crontask
     spec:
+      imagePullSecrets:
+        - name: dockerhub-regcred
       containers:
         - name: crontask-container
-          image: openim/openim-crontask:v3.8.3
+          image: ghcr.io/openimsdk/openim-crontask:sha-748d783d36fc
           env:
             - name: CONFIG_PATH
               value: "/config"
+            - name: IMENV_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openim-redis-secret
+                  key: redis-password
+            - name: IMENV_MONGODB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: openim-mongo-secret
+                  key: mongo_openim_username
+            - name: IMENV_MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openim-mongo-secret
+                  key: mongo_openim_password
+            - name: IMENV_KAFKA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openim-kafka-secret
+                  key: kafka-password
           volumeMounts:
             - name: openim-config
               mountPath: "/config"

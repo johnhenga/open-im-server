@@ -1,0 +1,452 @@
+---
+# Namespace (if not already created)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openim
+
+---
+# Headless Service for peer discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd-headless
+  namespace: openim
+  labels:
+    app: etcd
+spec:
+  clusterIP: None
+  selector:
+    app: etcd
+  ports:
+    - name: etcd-peer
+      port: 2380
+      targetPort: 2380
+      protocol: TCP
+    - name: etcd-client
+      port: 2379
+      targetPort: 2379
+      protocol: TCP
+  publishNotReadyAddresses: true
+
+---
+# Client Service for application access
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd-client
+  namespace: openim
+  labels:
+    app: etcd
+spec:
+  type: ClusterIP
+  selector:
+    app: etcd
+  ports:
+    - name: etcd-client
+      port: 2379
+      targetPort: 2379
+      protocol: TCP
+
+---
+# Secret for optional etcd authentication credentials
+# Mirrors docker-compose ETCD_ROOT_USER / ETCD_ROOT_PASSWORD / ETCD_USERNAME / ETCD_PASSWORD
+# Leave values empty to run in no-auth mode (ALLOW_NONE_AUTHENTICATION=yes)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: etcd-auth
+  namespace: openim
+type: Opaque
+stringData:
+  ETCD_ROOT_USER: ""
+  ETCD_ROOT_PASSWORD: ""
+  ETCD_USERNAME: ""
+  ETCD_PASSWORD: ""
+
+---
+# StatefulSet for etcd cluster
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: etcd
+  namespace: openim
+  labels:
+    app: etcd
+spec:
+  serviceName: etcd-headless
+  replicas: 3
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: etcd
+  template:
+    metadata:
+      labels:
+        app: etcd
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2379"
+        prometheus.io/path: "/metrics"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - etcd
+                topologyKey: kubernetes.io/hostname
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: etcd
+          image: public.ecr.aws/eks-distro/etcd-io/etcd:v3.5.21-eks-1-34-latest
+          imagePullPolicy: IfNotPresent
+          # etcd reads ETCD_* env vars natively — no shell needed (distroless image)
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # Kubernetes $(VAR) substitution resolves POD_NAME before passing to etcd
+            - name: ETCD_NAME
+              value: "$(POD_NAME)"
+            - name: ETCD_DATA_DIR
+              value: "/etcd-data"
+            - name: ETCD_INITIAL_CLUSTER_STATE
+              value: "new"
+            - name: ETCD_INITIAL_CLUSTER_TOKEN
+              value: "etcd-ha-cluster"
+            - name: ETCD_INITIAL_CLUSTER
+              value: "etcd-0=http://etcd-0.etcd-headless.openim.svc.cluster.local:2380,etcd-1=http://etcd-1.etcd-headless.openim.svc.cluster.local:2380,etcd-2=http://etcd-2.etcd-headless.openim.svc.cluster.local:2380"
+            - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
+              value: "http://$(POD_NAME).etcd-headless.openim.svc.cluster.local:2380"
+            - name: ETCD_LISTEN_PEER_URLS
+              value: "http://0.0.0.0:2380"
+            - name: ETCD_ADVERTISE_CLIENT_URLS
+              value: "http://$(POD_NAME).etcd-headless.openim.svc.cluster.local:2379"
+            - name: ETCD_LISTEN_CLIENT_URLS
+              value: "http://0.0.0.0:2379"
+            - name: ETCD_HEARTBEAT_INTERVAL
+              value: "100"
+            - name: ETCD_ELECTION_TIMEOUT
+              value: "1000"
+            - name: ETCD_MAX_SNAPSHOTS
+              value: "5"
+            - name: ETCD_MAX_WALS
+              value: "5"
+            - name: ETCD_QUOTA_BACKEND_BYTES
+              value: "8589934592"
+            - name: ETCD_LOG_LEVEL
+              value: "info"
+            - name: ETCD_LOGGER
+              value: "zap"
+            - name: ETCD_LOG_OUTPUTS
+              value: "stdout"
+            # Optional auth — mirrors docker-compose ETCD_ROOT_USER/PASSWORD, ETCD_USERNAME/PASSWORD
+            # Set values in the etcd-auth Secret to enable authentication
+            - name: ETCD_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: etcd-auth
+                  key: ETCD_ROOT_USER
+                  optional: true
+            - name: ETCD_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: etcd-auth
+                  key: ETCD_ROOT_PASSWORD
+                  optional: true
+            - name: ETCD_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: etcd-auth
+                  key: ETCD_USERNAME
+                  optional: true
+            - name: ETCD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: etcd-auth
+                  key: ETCD_PASSWORD
+                  optional: true
+            # No-auth mode when credentials are not set (matches docker-compose ALLOW_NONE_AUTHENTICATION)
+            - name: ALLOW_NONE_AUTHENTICATION
+              value: "yes"
+          ports:
+            - name: etcd-client
+              containerPort: 2379
+              protocol: TCP
+            - name: etcd-peer
+              containerPort: 2380
+              protocol: TCP
+          volumeMounts:
+            - name: etcd-data
+              mountPath: /etcd-data
+          # Shell-free probes (distroless image — no /bin/sh available) — call etcdctl binary directly (distroless compatible)
+          livenessProbe:
+            exec:
+              command:
+                - /usr/local/bin/etcdctl
+                - --endpoints=http://localhost:2379
+                - endpoint
+                - health
+                - --command-timeout=10s
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /usr/local/bin/etcdctl
+                - --endpoints=http://localhost:2379
+                - endpoint
+                - health
+                - --command-timeout=5s
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 1
+          startupProbe:
+            exec:
+              command:
+                - /usr/local/bin/etcdctl
+                - --endpoints=http://localhost:2379
+                - endpoint
+                - health
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 12 # 60 seconds max startup time
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+
+  volumeClaimTemplates:
+    - metadata:
+        name: etcd-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: gp3-csi
+        resources:
+          requests:
+            storage: 10Gi
+
+---
+# Pod Disruption Budget for HA
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: etcd-pdb
+  namespace: openim
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: etcd
+
+---
+# NetworkPolicy to restrict access to etcd
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: etcd-network-policy
+  namespace: openim
+spec:
+  podSelector:
+    matchLabels:
+      app: etcd
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow intra-etcd communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app: etcd
+      ports:
+        - protocol: TCP
+          port: 2379
+        - protocol: TCP
+          port: 2380
+    # Allow from other OpenIM services
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: openim
+      ports:
+        - protocol: TCP
+          port: 2379
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow intra-etcd communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app: etcd
+      ports:
+        - protocol: TCP
+          port: 2379
+        - protocol: TCP
+          port: 2380
+    # Allow to OpenIM services if needed
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: openim
+      ports:
+        - protocol: TCP
+          port: 2379
+
+---
+# ServiceMonitor for Prometheus (if using Prometheus operator)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: etcd
+  namespace: openim
+  labels:
+    app: etcd
+spec:
+  selector:
+    matchLabels:
+      app: etcd
+  endpoints:
+    - port: etcd-client
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+
+---
+# Auth-setup Job — mirrors docker-compose etcd startup script for auth initialization
+# Runs once after cluster is healthy; skipped automatically if credentials are not set.
+# Uses amazonlinux:2023 (ECR public) + downloads etcdctl for the setup script.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: etcd-auth-setup
+  namespace: openim
+  annotations:
+    description: "One-time job to configure etcd auth. Mirrors docker-compose etcd init script."
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: etcd-auth-setup
+          image: public.ecr.aws/amazonlinux/amazonlinux:2023
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              export ETCDCTL_API=3
+              ENDPOINT=http://etcd-client.openim.svc.cluster.local:2379
+              ETCD_VERSION=v3.5.21
+
+              # Download etcdctl binary
+              echo "Downloading etcdctl ${ETCD_VERSION}..."
+              dnf install -y tar gzip 2>/dev/null
+              curl -sfL "https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz" \
+                | tar xz -C /tmp --strip=1 "etcd-${ETCD_VERSION}-linux-amd64/etcdctl"
+              chmod +x /tmp/etcdctl
+              alias etcdctl=/tmp/etcdctl
+
+              echo "Waiting for etcd cluster to become healthy..."
+              until /tmp/etcdctl --endpoints=${ENDPOINT} endpoint health 2>/dev/null; do
+                echo "Waiting for etcd..."
+                sleep 2
+              done
+              echo "etcd is healthy."
+
+              if [ -z "${ETCD_ROOT_USER}" ] || [ -z "${ETCD_USERNAME}" ]; then
+                echo "No authentication credentials provided. Running in no-auth mode."
+                echo "To enable auth, populate the etcd-auth Secret with ETCD_ROOT_USER, ETCD_ROOT_PASSWORD, ETCD_USERNAME, ETCD_PASSWORD."
+                exit 0
+              fi
+
+              echo "Authentication credentials found. Configuring auth..."
+
+              if ! /tmp/etcdctl --endpoints=${ENDPOINT} auth status | grep -q "Authentication Status: true"; then
+                echo "Auth is disabled. Creating users and enabling..."
+
+                /tmp/etcdctl --endpoints=${ENDPOINT} user add ${ETCD_ROOT_USER} --new-user-password=${ETCD_ROOT_PASSWORD} || true
+                /tmp/etcdctl --endpoints=${ENDPOINT} user add ${ETCD_USERNAME} --new-user-password=${ETCD_PASSWORD} || true
+
+                /tmp/etcdctl --endpoints=${ENDPOINT} role add openim-role || true
+                /tmp/etcdctl --endpoints=${ENDPOINT} role grant-permission openim-role --prefix=true readwrite / || true
+                /tmp/etcdctl --endpoints=${ENDPOINT} user grant-role ${ETCD_USERNAME} openim-role || true
+                /tmp/etcdctl --endpoints=${ENDPOINT} user grant-role ${ETCD_ROOT_USER} root || true
+
+                /tmp/etcdctl --endpoints=${ENDPOINT} auth enable
+                echo "Authentication enabled successfully."
+              else
+                echo "Authentication already enabled. Verifying user..."
+                if ! /tmp/etcdctl --endpoints=${ENDPOINT} --user=${ETCD_USERNAME}:${ETCD_PASSWORD} put /test/auth "auth-check" 2>/dev/null; then
+                  echo "User test failed — recreating with root credentials..."
+                  /tmp/etcdctl --endpoints=${ENDPOINT} --user=${ETCD_ROOT_USER}:${ETCD_ROOT_PASSWORD} user add ${ETCD_USERNAME} --new-user-password=${ETCD_PASSWORD} || true
+                  /tmp/etcdctl --endpoints=${ENDPOINT} --user=${ETCD_ROOT_USER}:${ETCD_ROOT_PASSWORD} role add openim-role || true
+                  /tmp/etcdctl --endpoints=${ENDPOINT} --user=${ETCD_ROOT_USER}:${ETCD_ROOT_PASSWORD} role grant-permission openim-role --prefix=true readwrite / || true
+                  /tmp/etcdctl --endpoints=${ENDPOINT} --user=${ETCD_ROOT_USER}:${ETCD_ROOT_PASSWORD} user grant-role ${ETCD_USERNAME} openim-role || true
+                else
+                  echo "User exists and has correct permissions."
+                  /tmp/etcdctl --endpoints=${ENDPOINT} --user=${ETCD_USERNAME}:${ETCD_PASSWORD} del /test/auth 2>/dev/null
+                fi
+              fi
+
+              echo "Testing auth with OpenIM user..."
+              /tmp/etcdctl --endpoints=${ENDPOINT} --user=${ETCD_USERNAME}:${ETCD_PASSWORD} put /test/auth "auth-works"
+              /tmp/etcdctl --endpoints=${ENDPOINT} --user=${ETCD_USERNAME}:${ETCD_PASSWORD} del /test/auth
+              echo "Auth working correctly."
+          env:
+            - name: ETCD_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: etcd-auth
+                  key: ETCD_ROOT_USER
+                  optional: true
+            - name: ETCD_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: etcd-auth
+                  key: ETCD_ROOT_PASSWORD
+                  optional: true
+            - name: ETCD_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: etcd-auth
+                  key: ETCD_USERNAME
+                  optional: true
+            - name: ETCD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: etcd-auth
+                  key: ETCD_PASSWORD
+                  optional: true

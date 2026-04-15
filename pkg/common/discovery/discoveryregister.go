@@ -34,14 +34,6 @@ func NewDiscoveryRegister(discovery *config.Discovery, watchNames []string) (dis
 	if config.Standalone() {
 		return standalone.GetSvcDiscoveryRegistry(), nil
 	}
-	if runtimeenv.RuntimeEnvironment() == config.KUBERNETES {
-		return kubernetes.NewConnManager(discovery.Kubernetes.Namespace, nil,
-			grpc.WithDefaultCallOptions(
-				grpc.MaxCallSendMsgSize(1024*1024*20),
-			),
-		)
-	}
-
 	switch discovery.Enable {
 	case config.ETCD:
 		return etcd.NewSvcDiscoveryRegistry(
@@ -51,7 +43,20 @@ func NewDiscoveryRegister(discovery *config.Discovery, watchNames []string) (dis
 			etcd.WithDialTimeout(10*time.Second),
 			etcd.WithMaxCallSendMsgSize(20*1024*1024),
 			etcd.WithUsernameAndPassword(discovery.Etcd.Username, discovery.Etcd.Password))
+	case config.KUBERNETES:
+		return kubernetes.NewConnManager(discovery.Kubernetes.Namespace, nil,
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallSendMsgSize(1024*1024*20),
+			),
+		)
 	default:
+		if runtimeenv.RuntimeEnvironment() == config.KUBERNETES {
+			return kubernetes.NewConnManager(discovery.Kubernetes.Namespace, nil,
+				grpc.WithDefaultCallOptions(
+					grpc.MaxCallSendMsgSize(1024*1024*20),
+				),
+			)
+		}
 		return nil, errs.New("unsupported discovery type", "type", discovery.Enable).Wrap()
 	}
 }
