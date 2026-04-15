@@ -13,7 +13,7 @@ spec:
         app: msg-rpc-server
     spec:
       imagePullSecrets:
-        - name: dockerhub-regcred
+        - name: dockerhub-secret
       containers:
         - name: msg-rpc-server-container
           image: openim/openim-rpc-msg:v3.8.3

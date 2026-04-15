@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: messagegateway-rpc-server
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: messagegateway-rpc-server
@@ -13,10 +13,10 @@ spec:
         app: messagegateway-rpc-server
     spec:
       imagePullSecrets:
-        - name: dockerhub-regcred
+        - name: dockerhub-secret
       containers:
         - name: openim-msggateway-container
-          image: openim/openim-msggateway:v3.8.3
+          image: openim/openim-msggateway:v3.8.3-patch
           env:
             - name: CONFIG_PATH
               value: "/config"

@@ -13,7 +13,7 @@ spec:
         app: user-rpc-server
     spec:
       imagePullSecrets:
-        - name: dockerhub-regcred
+        - name: dockerhub-secret
       containers:
         - name: user-rpc-server-container
           image: openim/openim-rpc-user:v3.8.3

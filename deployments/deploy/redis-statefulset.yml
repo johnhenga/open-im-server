@@ -14,7 +14,7 @@ spec:
         app: redis
     spec:
       imagePullSecrets:
-        - name: dockerhub-regcred
+        - name: dockerhub-secret
       containers:
         - name: redis
           image: redis:7.0.0

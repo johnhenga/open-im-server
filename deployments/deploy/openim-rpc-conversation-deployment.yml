@@ -13,7 +13,7 @@ spec:
         app: conversation-rpc-server
     spec:
       imagePullSecrets:
-        - name: dockerhub-regcred
+        - name: dockerhub-secret
       containers:
         - name: conversation-rpc-server-container
           image: openim/openim-rpc-conversation:v3.8.3

@@ -13,7 +13,7 @@ spec:
         app: friend-rpc-server
     spec:
       imagePullSecrets:
-        - name: dockerhub-regcred
+        - name: dockerhub-secret
       containers:
         - name: friend-rpc-server-container
           image: openim/openim-rpc-friend:v3.8.3

@@ -14,7 +14,7 @@ spec:
         app: mongo
     spec:
       imagePullSecrets:
-        - name: dockerhub-regcred
+        - name: dockerhub-secret
       containers:
         - name: mongo
           image: mongo:7.0
