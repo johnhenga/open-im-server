@@ -6,7 +6,7 @@ data:
   discovery.yml: |
     enable: "kubernetes" # "kubernetes" or "etcd"
     kubernetes:
-      namespace: default
+      namespace: openim-dev
     etcd:
       rootDirectory: openim
       address: [ localhost:12379 ]
@@ -384,9 +384,9 @@ data:
 
   kafka.yml: |
     # Username for authentication
-    username: ''
+    username: 'admin'
     # Password for authentication
-    password: ''
+    password: 'openIM123'
     # Producer acknowledgment settings
     producerAck:
     # Compression type to use (e.g., none, gzip, snappy)

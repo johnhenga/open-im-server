@@ -5,7 +5,7 @@ metadata:
   labels:
     app: kafka
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: kafka
@@ -15,9 +15,11 @@ spec:
       labels:
         app: kafka
     spec:
+      imagePullSecrets:
+        - name: dockerhub-secret
       containers:
         - name: kafka
-          image: bitnami/kafka:3.5.1
+          image: public.ecr.aws/bitnami/kafka:3.5.2
           imagePullPolicy: IfNotPresent
           resources:
             limits:
@@ -32,7 +34,7 @@ spec:
             - containerPort: 9094 # EXTERNAL
           env:
             - name: TZ
-              value: "Asia/Shanghai"
+              value: "Asia/Bangkok"
             - name: KAFKA_CFG_NODE_ID
               value: "0"
             - name: KAFKA_CFG_PROCESS_ROLES
@@ -44,11 +46,27 @@ spec:
             - name: KAFKA_CFG_ADVERTISED_LISTENERS
               value: "PLAINTEXT://kafka-service:9092,EXTERNAL://kafka-service:19094"
             - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
-              value: "CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+              value: "CONTROLLER:PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,PLAINTEXT:SASL_PLAINTEXT"
             - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
               value: "CONTROLLER"
             - name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
               value: "true"
+            - name: KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL
+              value: "PLAIN"
+            - name: KAFKA_CFG_SASL_ENABLED_MECHANISMS
+              value: "PLAIN"
+            - name: KAFKA_CLIENT_USERS
+              valueFrom:
+                secretKeyRef:
+                  name: openim-kafka-secret
+                  key: kafka-username
+            - name: KAFKA_CLIENT_PASSWORDS
+              valueFrom:
+                secretKeyRef:
+                  name: openim-kafka-secret
+                  key: kafka-password
+            - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
           volumeMounts:
             - name: kafka-data
               mountPath: /bitnami/kafka
