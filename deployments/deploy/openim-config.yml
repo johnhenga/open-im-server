@@ -9,7 +9,7 @@ data:
       namespace: openim
     etcd:
       rootDirectory: openim
-      address: [ localhost:12379 ]
+      address: [ etcd-client.openim:2379 ]
       username: ''
       password: ''
 
