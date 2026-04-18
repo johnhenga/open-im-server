@@ -16,24 +16,47 @@ spec:
         - name: dockerhub-secret
       containers:
         - name: auth-rpc-server-container
-          image: openim/openim-rpc-auth:v3.8.3
-          imagePullPolicy: IfNotPresent
+          image: openim/openim-server:v3.8.3-patch.12
           env:
             - name: CONFIG_PATH
-              value: "/config"
+              value: "/openim-server/config"
+            - name: IMENV_MONGODB_ADDRESS
+              value: "mongo:27017"
+            - name: IMENV_REDIS_ADDRESS
+              value: "redis:6379"
             - name: IMENV_REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: openim-redis-secret
                   key: redis-password
+            - name: IMENV_KAFKA_ADDRESS
+              value: "kafka:9094"
+            - name: IMENV_MINIO_INTERNALADDRESS
+              value: "minio:9000"
+            - name: IMENV_MINIO_EXTERNALADDRESS
+              value: "http://minio:9000"
+            - name: IMENV_MINIO_ACCESSKEYID
+              value: "root"
+            - name: IMENV_MINIO_SECRETACCESSKEY
+              value: "openIM123"
+            - name: IMENV_DISCOVERY_ENABLE
+              value: "k8s"
           volumeMounts:
             - name: openim-config
-              mountPath: "/config"
+              mountPath: /openim-server/config
+              readOnly: true
+            - name: start-config
+              mountPath: /openim-server/start-config.yml
+              subPath: start-config.yml
               readOnly: true
           ports:
             - containerPort: 10200
             - containerPort: 12200
+      serviceAccountName: openim-services
       volumes:
         - name: openim-config
           configMap:
             name: openim-config
+        - name: start-config
+          configMap:
+            name: openim-start-config-auth
