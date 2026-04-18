@@ -1,0 +1,29 @@
+@startuml
+title OpenIM - Login + API Call Sequence (3.8.3-patch)
+
+autonumber
+
+actor "Client" as C
+participant "openim-api\n(HTTP REST)" as API
+participant "openim-rpc-auth\n(gRPC)" as Auth
+participant "openim-rpc-user\n(gRPC)" as User
+database "Redis" as Redis
+database "MongoDB" as Mongo
+
+C -> API : POST /login (credentials)
+API -> Auth : Authenticate + issue token
+Auth -> Redis : Store/refresh session/token state
+Redis --> Auth : OK
+Auth --> API : JWT/token + userId
+API --> C : 200 OK + token
+
+C -> API : GET /user/profile\nAuthorization: Bearer <token>
+API -> Auth : Verify token
+Auth --> API : OK
+API -> User : GetUserInfo(userId)
+User -> Mongo : Read user profile
+Mongo --> User : user data
+User --> API : user data
+API --> C : 200 OK + profile
+
+@enduml

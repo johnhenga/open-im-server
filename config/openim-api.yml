@@ -11,7 +11,7 @@ prometheus:
   # Enable Prometheus metrics exposure for this service; set to true to allow scraping.
   enable: true
   # autoSetPorts indicates whether to automatically set the ports
-  autoSetPorts: true
+  autoSetPorts: false
   # Prometheus listening ports, must match the number of api.ports
   # It will only take effect when autoSetPorts is set to false.
   ports: [ 12002 ]

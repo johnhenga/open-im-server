@@ -1,0 +1,42 @@
+@startuml
+title OpenIM - Message Send Sequence (3.8.3-patch)
+
+autonumber
+
+actor "Client (SDK)" as C
+participant "openim-msggateway\n(LongConn/WS)" as GW
+participant "openim-rpc-auth\n(gRPC)" as Auth
+queue "Kafka" as Kafka
+participant "openim-msgtransfer" as Xfer
+participant "openim-rpc-msg\n(gRPC)" as Msg
+participant "openim-rpc-conversation\n(gRPC)" as Conv
+database "Redis" as Redis
+database "MongoDB" as Mongo
+participant "openim-push" as Push
+
+C -> GW : SendMessage (WS/LongConn)
+GW -> Auth : Verify token/session
+Auth --> GW : OK (identity)
+
+GW -> Kafka : Publish message event\n(persist/fanout)
+Kafka -> Xfer : Deliver message event (consumer)
+
+Xfer -> Msg : Store message / assign seq / indexes
+Msg -> Mongo : Persist message / offline records
+Mongo --> Msg : OK
+Msg -> Redis : Update latest seq / cache
+Redis --> Msg : OK
+Msg --> Xfer : Stored + seq info
+
+Xfer -> Conv : Update conversation state\n(unread, lastMsg, etc.)
+Conv -> Mongo : Persist conversation changes
+Mongo --> Conv : OK
+Conv --> Xfer : OK
+
+Xfer -> Kafka : Publish push event\n(topic: msgToPush)
+Kafka -> Push : Deliver push event (consumer)
+Push -> Redis : Lookup online/device/push config
+Redis --> Push : Device/setting info
+Push --> C : Push notification (APNs/FCM/vendor)
+
+@enduml

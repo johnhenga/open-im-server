@@ -1,0 +1,83 @@
+@startuml
+title OpenIM Server (3.8.3-patch) - Service-to-service Call Graph (Logical)
+
+skinparam componentStyle rectangle
+
+actor "Client (SDK/Web/Mobile)" as C
+
+component "openim-api\n(HTTP REST)" as API
+component "openim-msggateway\n(LongConn/WS + gRPC)" as GW
+
+component "openim-rpc-auth" as R_AUTH
+component "openim-rpc-user" as R_USER
+component "openim-rpc-friend" as R_FRIEND
+component "openim-rpc-group" as R_GROUP
+component "openim-rpc-conversation" as R_CONV
+component "openim-rpc-msg" as R_MSG
+component "openim-rpc-third" as R_THIRD
+
+component "openim-msgtransfer\n(async workers)" as XFER
+component "openim-push\n(push workers)" as PUSH
+component "openim-crontask" as CRON
+
+queue "Kafka" as KAFKA
+database "MongoDB" as MONGO
+database "Redis" as REDIS
+component "MinIO" as MINIO
+component "Service Discovery\n(etcd / standalone)" as DISC
+
+C --> API
+C --> GW
+
+' API uses gRPC services
+API --> R_AUTH
+API --> R_USER
+API --> R_FRIEND
+API --> R_GROUP
+API --> R_CONV
+API --> R_MSG
+API --> R_THIRD
+
+' Gateway uses auth + message/conversation services
+GW --> R_AUTH
+GW --> R_MSG
+GW --> R_CONV
+GW --> R_USER
+GW --> R_GROUP
+GW --> R_FRIEND
+
+' Async pipeline
+API --> KAFKA
+GW --> KAFKA
+KAFKA --> XFER
+KAFKA --> PUSH
+
+' Persistence/caches (typical)
+R_MSG --> MONGO
+R_MSG --> REDIS
+R_CONV --> MONGO
+R_AUTH --> REDIS
+R_USER --> MONGO
+R_FRIEND --> MONGO
+R_GROUP --> MONGO
+R_THIRD --> MINIO
+
+XFER --> MONGO
+XFER --> REDIS
+PUSH --> REDIS
+
+' Discovery (all register/resolve)
+API ..> DISC
+GW ..> DISC
+R_AUTH ..> DISC
+R_USER ..> DISC
+R_FRIEND ..> DISC
+R_GROUP ..> DISC
+R_CONV ..> DISC
+R_MSG ..> DISC
+R_THIRD ..> DISC
+XFER ..> DISC
+PUSH ..> DISC
+CRON ..> DISC
+
+@enduml

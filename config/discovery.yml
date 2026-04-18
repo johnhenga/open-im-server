@@ -1,8 +1,8 @@
-enable: etcd
+enable: "k8s" # "k8s" or "etcd"
+kubernetes:
+  namespace: openim
 etcd:
   rootDirectory: openim
-  address: [ localhost:12379 ]
-  username: ''
-  password: ''
-
-
+  address: [ etcd-client.openim:2379 ]
+  username: ""
+  password: ""

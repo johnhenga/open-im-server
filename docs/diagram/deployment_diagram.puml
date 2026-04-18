@@ -1,0 +1,114 @@
+@startuml
+title OpenIM Server (3.8.3-patch) - Kubernetes Deployment View
+
+skinparam componentStyle rectangle
+
+cloud "Clients" as clients {
+  [Web / Admin] as web
+  [Mobile Apps] as mobile
+  [SDK Clients] as sdk
+}
+
+node "Kubernetes Cluster" as k8s {
+
+  frame "Ingress" as ing {
+    component "Ingress\nopenim-ingress\nclass: openim-nginx\npaths:\n- /openim-api -> openim-api-service:10002\n- /openim-msggateway -> openim-msggateway-service:10001" as openim_ing
+  }
+
+  frame "OpenIM Deployments (apps/v1)" as apps {
+    component "Deployment\nopenim-api\nreplicas: 2\ncontainer: openim/openim-api:v3.8.3\nports: 10002, 12002\nmount: /config (ConfigMap openim-config)" as dep_api
+
+    component "Deployment\nmessagegateway-rpc-server\nreplicas: 1\ncontainer: openim/openim-msggateway:v3.8.3-patch\nports: 10140, 12001\nmount: /config (ConfigMap openim-config)" as dep_gw
+
+    component "Deployment\nopenim-msgtransfer-server\nreplicas: 2\ncontainer: openim/openim-msgtransfer:v3.8.3\nport: 12020\nmount: /config (ConfigMap openim-config)" as dep_xfer
+
+    component "Deployment\nopenim-crontask\nreplicas: 2\ncontainer: openim/openim-crontask:v3.8.3\nmount: /config (ConfigMap openim-config)" as dep_cron
+
+    component "Deployment\nopenim-push\n(container: openim/openim-push:v3.8.3)\n[manifest present]" as dep_push
+
+    component "Deployment\nopenim-rpc-auth\n(container: openim/openim-rpc-auth:v3.8.3)\n[manifest present]" as dep_rpc_auth
+    component "Deployment\nopenim-rpc-user\n[manifest present]" as dep_rpc_user
+    component "Deployment\nopenim-rpc-friend\n[manifest present]" as dep_rpc_friend
+    component "Deployment\nopenim-rpc-group\n[manifest present]" as dep_rpc_group
+    component "Deployment\nopenim-rpc-conversation\n[manifest present]" as dep_rpc_conv
+    component "Deployment\nopenim-rpc-msg\n(msg-rpc-server)\ncontainer: openim/openim-rpc-msg:v3.8.3\nports: 10280, 12280\nmount: /config" as dep_rpc_msg
+    component "Deployment\nopenim-rpc-third\n[manifest present]" as dep_rpc_third
+  }
+
+  frame "K8s Services" as svcs {
+    component "Service\nmessagegateway-rpc-service\ntype: NodePort\nports:\n- 10001 (longConn)\n- 10140 (grpc)\n- 12001 (prom)" as svc_gw
+
+    component "Service\nopenim-msgtransfer-service\ntype: ClusterIP\nport: 12020 (prom)" as svc_xfer
+
+    component "Service\nkafka-service\nClusterIP\nports: 9092/9093/19094" as svc_kafka
+
+    component "Service\nconversation-rpc-service\nClusterIP\nports: 10220, 12220" as svc_rpc_conv
+
+    component "Service\nopenim-api-service\n(port 10002)\n[referenced by Ingress]" as svc_api
+    component "Service\nopenim-msggateway-service\n(port 10001)\n[referenced by Ingress]" as svc_gw_ing
+  }
+
+  frame "Config & Secrets" as cfg {
+    component "ConfigMap\nopenim-config\n(mounted at /config)" as cm_cfg
+    component "Secret\nopenim-redis-secret" as sec_redis
+    component "Secret\nopenim-mongo-secret" as sec_mongo
+    component "Secret\nopenim-kafka-secret" as sec_kafka
+    component "Secret\nminio-secret\n[manifest present]" as sec_minio
+  }
+
+  frame "Stateful dependencies (manifests present)" as deps {
+    database "MongoDB\n(mongo-statefulset.yml)" as mongo
+    database "Redis\n(redis-statefulset.yml)" as redis
+    queue "Kafka\n(kafka-statefulset.yml)" as kafka
+    component "MinIO\n(minio-statefulset.yml)" as minio
+    component "etcd\n(etcd-statefulset.yml)" as etcd
+  }
+}
+
+' Client traffic -> ingress
+web --> openim_ing
+mobile --> openim_ing
+sdk --> openim_ing
+
+' Ingress routes (by manifest)
+openim_ing --> svc_api
+openim_ing --> svc_gw_ing
+
+' Services select deployments (simplified)
+svc_api --> dep_api
+svc_gw --> dep_gw
+svc_xfer --> dep_xfer
+svc_rpc_conv --> dep_rpc_conv
+svc_kafka --> kafka
+
+' Pods use config/secrets
+dep_api --> cm_cfg
+dep_api --> sec_redis
+dep_api --> sec_mongo
+
+dep_gw --> cm_cfg
+dep_gw --> sec_redis
+
+dep_xfer --> cm_cfg
+dep_xfer --> sec_redis
+dep_xfer --> sec_mongo
+dep_xfer --> sec_kafka
+
+dep_rpc_msg --> cm_cfg
+dep_rpc_msg --> sec_redis
+dep_rpc_msg --> sec_mongo
+dep_rpc_msg --> sec_kafka
+
+' Infra dependencies
+dep_api --> redis
+dep_api --> mongo
+dep_gw --> redis
+dep_xfer --> kafka
+dep_xfer --> redis
+dep_xfer --> mongo
+dep_rpc_msg --> redis
+dep_rpc_msg --> mongo
+dep_rpc_third --> minio
+dep_rpc_auth --> redis
+
+@enduml

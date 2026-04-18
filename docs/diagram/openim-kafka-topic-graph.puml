@@ -1,0 +1,34 @@
+@startuml
+title OpenIM Server (3.8.3-patch) - Kafka Topic Graph
+
+skinparam componentStyle rectangle
+
+component "openim-msggateway" as GW
+component "openim-api" as API
+component "openim-msgtransfer" as XFER
+component "openim-push" as PUSH
+
+queue "Kafka Topic:\nlatestMsgToRedis" as T1
+queue "Kafka Topic:\nmsgToPush" as T2
+queue "Kafka Topic:\nofflineMsgToMongoMysql" as T3
+
+database "Redis" as REDIS
+database "MongoDB" as MONGO
+
+' Producers (high-level)
+GW --> T1 : publish
+GW --> T2 : publish
+GW --> T3 : publish
+API --> T2 : publish (notifications/events)
+
+' Consumers (documented + typical)
+T1 --> XFER : consume
+XFER --> REDIS : update latest msg cache/state
+
+T3 --> XFER : consume
+XFER --> MONGO : persist offline/message records
+
+T2 --> PUSH : consume
+PUSH --> REDIS : lookup device/online state (if needed)
+
+@enduml

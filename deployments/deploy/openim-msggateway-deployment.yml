@@ -16,18 +16,48 @@ spec:
         - name: dockerhub-secret
       containers:
         - name: openim-msggateway-container
-          image: openim/openim-msggateway:v3.8.3-patch
+          image: openim/openim-server:v3.8.3-patch.12
           env:
             - name: CONFIG_PATH
-              value: "/config"
+              value: /config
+            - name: IMENV_MONGODB_ADDRESS
+              value: "mongo:27017"
+            - name: IMENV_MONGODB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: openim-mongo-secret
+                  key: mongo_openim_username
+            - name: IMENV_MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openim-mongo-secret
+                  key: mongo_openim_password
             - name: IMENV_REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: openim-redis-secret
                   key: redis-password
+            - name: IMENV_DISCOVERY_ENABLE
+              value: "k8s"
+            - name: IMENV_REDIS_ADDRESS
+              value: "redis:6379"
+            - name: IMENV_KAFKA_ADDRESS
+              value: "kafka:9094"
+            - name: IMENV_MINIO_INTERNALADDRESS
+              value: "minio:9000"
+            - name: IMENV_MINIO_EXTERNALADDRESS
+              value: "http://minio:9000"
+            - name: IMENV_MINIO_ACCESSKEYID
+              value: "root"
+            - name: IMENV_MINIO_SECRETACCESSKEY
+              value: "openIM123"
           volumeMounts:
             - name: openim-config
-              mountPath: "/config"
+              mountPath: /openim-server/config
+              readOnly: true
+            - name: start-config
+              mountPath: /openim-server/start-config.yml
+              subPath: start-config.yml
               readOnly: true
           ports:
             - containerPort: 10140
@@ -36,3 +66,6 @@ spec:
         - name: openim-config
           configMap:
             name: openim-config
+        - name: start-config
+          configMap:
+            name: openim-start-config
