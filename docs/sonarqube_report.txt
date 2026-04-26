@@ -1,0 +1,404 @@
+SONARQUBE SCAN REPORT - OPENIM-SERVER
+========================================
+Total Issues: 172
+----------------------------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 1123)
+Message: Refactor this method to reduce its Cognitive Complexity from 32 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 538)
+Message: Refactor this method to reduce its Cognitive Complexity from 32 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 205)
+Message: Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 361)
+Message: Refactor this method to reduce its Cognitive Complexity from 45 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 684)
+Message: Refactor this method to reduce its Cognitive Complexity from 25 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 825)
+Message: Refactor this method to reduce its Cognitive Complexity from 38 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 907)
+Message: Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 1030)
+Message: Refactor this method to reduce its Cognitive Complexity from 28 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 1238)
+Message: Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 1569)
+Message: Refactor this method to reduce its Cognitive Complexity from 147 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msggateway/client_conn.go (Line 123)
+Message: Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/rpccache/online.go (Line 50)
+Message: Add a nested comment explaining why this function is empty or complete the implementation.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/localcache/lru/lru_lazy.go (Line 91)
+Message: Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/localcache/lru/lru_lazy.go (Line 188)
+Message: Add a nested comment explaining why this function is empty or complete the implementation.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/api/init.go (Line 38)
+Message: Refactor this method to reduce its Cognitive Complexity from 38 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msgtransfer/init.go (Line 127)
+Message: Refactor this method to reduce its Cognitive Complexity from 37 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/startrpc/start.go (Line 78)
+Message: Refactor this method to reduce its Cognitive Complexity from 50 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/conversation/conversation.go (Line 120)
+Message: Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msggateway/ws_server.go (Line 330)
+Message: Refactor this method to reduce its Cognitive Complexity from 36 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/api/jssdk/jssdk.go (Line 104)
+Message: Refactor this method to reduce its Cognitive Complexity from 22 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msgtransfer/online_history_msg_handler.go (Line 142)
+Message: Refactor this method to reduce its Cognitive Complexity from 22 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/sync.go (Line 73)
+Message: Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/startrpc/start.go (Line 47)
+Message: Refactor this method to reduce its Cognitive Complexity from 20 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/controller/msg.go (Line 265)
+Message: Refactor this method to reduce its Cognitive Complexity from 24 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/kafka/tls.go (Line 45)
+Message: Define a constant instead of duplicating this literal "ReadFile failed" 3 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/notification.go (Line 241)
+Message: Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/msg/revoke.go (Line 35)
+Message: Refactor this method to reduce its Cognitive Complexity from 43 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 108)
+Message: Define a constant instead of duplicating this literal "$match" 15 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 111)
+Message: Define a constant instead of duplicating this literal "$project" 19 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 281)
+Message: Define a constant instead of duplicating this literal "$limit" 5 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 305)
+Message: Define a constant instead of duplicating this literal "$unwind" 9 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 347)
+Message: Define a constant instead of duplicating this literal "msgs.msg.send_time" 8 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 934)
+Message: Define a constant instead of duplicating this literal "msgs.msg.seq" 4 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 1182)
+Message: Refactor this method to reduce its Cognitive Complexity from 27 to the 15 allowed.
+--------------------
+[MAJOR] CODE_SMELL
+Location: pkg/common/startrpc/start.go (Line 78)
+Message: This function has 14 parameters, which is greater than the 7 authorized.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 451)
+Message: Define a constant instead of duplicating this literal "$regex" 7 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msggateway/online.go (Line 20)
+Message: Refactor this method to reduce its Cognitive Complexity from 31 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msgtransfer/online_history_msg_handler.go (Line 259)
+Message: Refactor this method to reduce its Cognitive Complexity from 29 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/push/push_handler.go (Line 312)
+Message: Refactor this method to reduce its Cognitive Complexity from 33 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/conversation/conversation.go (Line 249)
+Message: Refactor this method to reduce its Cognitive Complexity from 85 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/notification.go (Line 85)
+Message: Refactor this method to reduce its Cognitive Complexity from 21 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/msg/clear.go (Line 12)
+Message: Refactor this method to reduce its Cognitive Complexity from 21 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/msg/delete.go (Line 115)
+Message: Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/controller/msg.go (Line 137)
+Message: Refactor this method to reduce its Cognitive Complexity from 44 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 119)
+Message: Define a constant instead of duplicating this literal "$arrayElemAt" 6 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/conversation/conversation.go (Line 711)
+Message: Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/msg/as_read.go (Line 134)
+Message: Refactor this method to reduce its Cognitive Complexity from 30 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/controller/msg.go (Line 484)
+Message: Refactor this method to reduce its Cognitive Complexity from 21 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/msg/verify.go (Line 52)
+Message: Refactor this method to reduce its Cognitive Complexity from 51 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/controller/msg.go (Line 389)
+Message: Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/api/jssdk/jssdk.go (Line 54)
+Message: Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/api/jssdk/jssdk.go (Line 191)
+Message: Refactor this method to reduce its Cognitive Complexity from 18 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/controller/auth.go (Line 81)
+Message: Refactor this method to reduce its Cognitive Complexity from 23 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/controller/auth.go (Line 126)
+Message: Refactor this method to reduce its Cognitive Complexity from 68 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: tools/changelog/changelog.go (Line 39)
+Message: Refactor this method to reduce its Cognitive Complexity from 22 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/notification.go (Line 316)
+Message: Define a constant instead of duplicating this literal " failed" 20 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/cache/redis/token.go (Line 58)
+Message: Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.
+--------------------
+[INFO] CODE_SMELL
+Location: pkg/common/storage/controller/auth.go (Line 127)
+Message: Complete the task associated to this TODO comment.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/msg/filter.go (Line 37)
+Message: Refactor this method to reduce its Cognitive Complexity from 22 to the 15 allowed.
+--------------------
+[MAJOR] CODE_SMELL
+Location: pkg/msgprocessor/conversation.go (Line 42)
+Message: This branch's code block is the same as the block for the branch on line 34.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/api/user.go (Line 134)
+Message: Refactor this method to reduce its Cognitive Complexity from 26 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/cache/redis/seq_conversation.go (Line 369)
+Message: Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/cache/redis/seq_conversation.go (Line 445)
+Message: Refactor this method to reduce its Cognitive Complexity from 29 to the 15 allowed.
+--------------------
+[INFO] CODE_SMELL
+Location: pkg/common/storage/controller/msg.go (Line 724)
+Message: Complete the task associated to this TODO comment.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/controller/conversation.go (Line 95)
+Message: Refactor this method to reduce its Cognitive Complexity from 32 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/msg/sync_msg.go (Line 149)
+Message: Refactor this method to reduce its Cognitive Complexity from 29 to the 15 allowed.
+--------------------
+[INFO] CODE_SMELL
+Location: pkg/common/storage/controller/user.go (Line 116)
+Message: Complete the task associated to this TODO comment.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msggateway/message_handler.go (Line 182)
+Message: Define a constant instead of duplicating this literal "error marshaling response" 5 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msggateway/message_handler.go (Line 193)
+Message: Define a constant instead of duplicating this literal "validation failed" 4 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/rpccache/online.go (Line 84)
+Message: Refactor this method to reduce its Cognitive Complexity from 23 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/rpccache/online.go (Line 137)
+Message: Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/push/offlinepush/getui/push.go (Line 70)
+Message: Refactor this method to reduce its Cognitive Complexity from 39 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/controller/msg_transfer.go (Line 128)
+Message: Refactor this method to reduce its Cognitive Complexity from 44 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msggateway/message_handler.go (Line 228)
+Message: Define a constant instead of duplicating this literal "error unmarshaling request" 3 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/cache/redis/online_test.go (Line 49)
+Message: Add a nested comment explaining why this function is empty or complete the implementation.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/group/group.go (Line 166)
+Message: Define a constant instead of duplicating this literal "no group owner or admin" 4 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/rpccache/group.go (Line 76)
+Message: Define a constant instead of duplicating this literal "GroupLocalCache GetGroupInfo return" 4 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/controller/friend.go (Line 152)
+Message: Refactor this method to reduce its Cognitive Complexity from 23 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 314)
+Message: Define a constant instead of duplicating this literal "$group" 9 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 324)
+Message: Refactor this method to reduce its Cognitive Complexity from 30 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/msg.go (Line 102)
+Message: Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msggateway/hub_server.go (Line 130)
+Message: Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msggateway/hub_server.go (Line 169)
+Message: Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/incrversion/batch_option.go (Line 64)
+Message: Refactor this method to reduce its Cognitive Complexity from 30 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/rpc/incrversion/batch_option.go (Line 139)
+Message: Refactor this method to reduce its Cognitive Complexity from 21 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msggateway/subscription.go (Line 98)
+Message: Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/cache/redis/batch.go (Line 24)
+Message: Refactor this method to reduce its Cognitive Complexity from 39 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/localcache/option.go (Line 128)
+Message: Add a nested comment explaining why this function is empty or complete the implementation.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/localcache/option.go (Line 130)
+Message: Add a nested comment explaining why this function is empty or complete the implementation.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/localcache/option.go (Line 132)
+Message: Add a nested comment explaining why this function is empty or complete the implementation.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/localcache/option.go (Line 134)
+Message: Add a nested comment explaining why this function is empty or complete the implementation.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/localcache/option.go (Line 136)
+Message: Add a nested comment explaining why this function is empty or complete the implementation.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: tools/seq/internal/main.go (Line 68)
+Message: Refactor this method to reduce its Cognitive Complexity from 45 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: tools/seq/internal/main.go (Line 260)
+Message: Refactor this method to reduce its Cognitive Complexity from 50 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/controller/group.go (Line 260)
+Message: Refactor this method to reduce its Cognitive Complexity from 21 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/version_log.go (Line 112)
+Message: Define a constant instead of duplicating this literal "$version" 3 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/common/storage/database/mgo/version_log.go (Line 119)
+Message: Define a constant instead of duplicating this literal "$addFields" 5 times.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/push/offlinepush/fcm/push.go (Line 77)
+Message: Refactor this method to reduce its Cognitive Complexity from 49 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: internal/msgtransfer/online_history_msg_handler.go (Line 216)
+Message: Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.
+--------------------
+[CRITICAL] CODE_SMELL
+Location: pkg/tools/batcher/batcher.go (Line 84)
+Message: Add a nested comment explaining why this function is empty or complete the implementation.
+--------------------

@@ -1,0 +1,10 @@
+SONARQUBE EXECUTIVE SUMMARY - OPENIM-SERVER
+=============================================
+Reliability Rating:    A (0 Bugs)
+Security Rating:       A (0 Vulnerabilities)
+Maintainability:       A (172 Code Smells)
+Security Review:       E (Hotspots)
+---------------------------------------------
+Code Coverage:         2.6%
+Duplicated Lines:      2.5%
+=============================================
