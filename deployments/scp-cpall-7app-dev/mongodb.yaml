@@ -1,0 +1,17 @@
+# dev: single-member replicaset (keeps name rs0), no arbiter, smaller disk, no metrics
+replicaCount: 1
+arbiter:
+  enabled: false
+pdb:
+  create: false
+metrics:
+  enabled: false
+persistence:
+  size: 8Gi
+# bitnami purged public.ecr.aws/bitnami; use official legacy relocation
+global:
+  imageRegistry: docker.io
+  imagePullSecrets:
+    - docker-hub
+image:
+  repository: bitnamilegacy/mongodb
