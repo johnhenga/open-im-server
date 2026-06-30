@@ -1,4 +1,4 @@
-url: http://127.0.0.1:10006/callbackExample
+url: http://ai-engine-test:5000/webhook
 beforeSendSingleMsg:
   enable: false
   timeout: 5
@@ -21,11 +21,11 @@ afterUpdateUserInfoEx:
   enable:  false
   timeout: 5
 afterSendSingleMsg:
-  enable: false
-  timeout: 5
+  enable: true
+  timeout: 10
   # Only the senID/recvID specified in attentionIds will send the callback
   # if not set, all user messages will be callback
-  attentionIds: []
+  attentionIds: [bot10001]
   # See beforeSendSingleMsg comment.
   allowedTypes: []
   deniedTypes: []
