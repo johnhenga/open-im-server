@@ -157,9 +157,23 @@ func (f *Fcm) Push(ctx context.Context, userIDs []string, title, content string,
 		response, err := f.fcmMsgCli.SendEach(ctx, messages)
 		if err != nil {
 			Fail = Fail + messageCount
+			// Same error capture as the batch flush above. Without it this branch counts the
+			// failure but discards its cause, and the error below reads "send err:;message err:"
+			// with both fields empty — which makes a rejected registration token
+			// indistinguishable from rejected service-account credentials.
+			sendErrBuilder.WriteString(err.Error())
+			sendErrBuilder.WriteByte('.')
 		} else {
 			Success = Success + response.SuccessCount
 			Fail = Fail + response.FailureCount
+			if response.FailureCount != 0 {
+				for i := range response.Responses {
+					if !response.Responses[i].Success {
+						msgErrBuilder.WriteString(response.Responses[i].Error.Error())
+						msgErrBuilder.WriteByte('.')
+					}
+				}
+			}
 		}
 	}
 	if Fail != 0 {
