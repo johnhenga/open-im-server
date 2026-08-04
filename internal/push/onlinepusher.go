@@ -40,7 +40,16 @@ func (u emptyOnlinePusher) GetOnlinePushFailedUserIDs(ctx context.Context, msg *
 func NewOnlinePusher(disCov discovery.SvcDiscoveryRegistry, config *Config) OnlinePusher {
 	switch config.Discovery.Enable {
 	case "k8s":
-		return NewK8sStaticConsistentHash(disCov, config)
+		// SCP patch: was NewK8sStaticConsistentHash, which cannot work under k8s discovery.
+		// That pusher routes each user to one gateway via GetUserIdHashGatewayHost, but the
+		// kubernetes ConnManager (openimsdk/tools discovery/kubernetes) implements it as a stub
+		// returning ("", nil) — so every user hashed to the empty host and GetConn(ctx, "") dialed
+		// "kubernetes:///", a target that resolved once and never re-resolved. After a msggateway
+		// reschedule it pointed at a dead pod IP and every online push timed out, silently.
+		// DefaultAllNode fans out to every gateway conn from GetConns instead, and its
+		// GetOnlinePushFailedUserIDs computes pushToUserIDs-minus-succeeded, so a total online
+		// failure correctly falls back to offline/FCM push rather than notifying nobody.
+		return NewDefaultAllNode(disCov, config)
 	case "zookeeper":
 		return NewDefaultAllNode(disCov, config)
 	case "etcd":

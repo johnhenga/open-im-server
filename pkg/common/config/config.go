@@ -484,9 +484,20 @@ type ZooKeeper struct {
 }
 
 type Discovery struct {
-	Enable    string    `mapstructure:"enable"`
-	Etcd      Etcd      `mapstructure:"etcd"`
-	ZooKeeper ZooKeeper `mapstructure:"zooKeeper"`
+	Enable string `mapstructure:"enable"`
+	// SCP patch: discovery.yml has always carried a `kubernetes.namespace` key, but there was no
+	// struct field for it, so mapstructure silently dropped it and NewDiscoveryRegister passed a
+	// hardcoded "default" instead. That namespace is what GetConns/initializeConns and the
+	// watchEndpoints informer look Endpoints up in, so with it wrong the gateway fan-out finds
+	// nothing. (Other RPC paths are unaffected: they use GetConn -> "kubernetes:///<svc>" ->
+	// kuberesolver, which resolves in the pod's own namespace.)
+	Kubernetes Kubernetes `mapstructure:"kubernetes"`
+	Etcd       Etcd       `mapstructure:"etcd"`
+	ZooKeeper  ZooKeeper  `mapstructure:"zooKeeper"`
+}
+
+type Kubernetes struct {
+	Namespace string `mapstructure:"namespace"`
 }
 
 type Etcd struct {

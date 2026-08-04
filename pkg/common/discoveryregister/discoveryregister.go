@@ -29,7 +29,15 @@ import (
 func NewDiscoveryRegister(discovery *config.Discovery, share *config.Share, watchNames []string) (discovery.SvcDiscoveryRegistry, error) {
 	switch discovery.Enable {
 	case "k8s":
-		return kubernetes.NewConnManager("default", watchNames,
+		// SCP patch: was the literal "default". ConnManager uses this namespace for the Endpoints
+		// lookup in initializeConns and for the watchEndpoints informer, so a wrong one makes
+		// GetConns return nothing and leaves the gateway list frozen. Falls back to "default" so
+		// a config without the key behaves exactly as before.
+		namespace := discovery.Kubernetes.Namespace
+		if namespace == "" {
+			namespace = "default"
+		}
+		return kubernetes.NewConnManager(namespace, watchNames,
 			grpc.WithDefaultCallOptions(
 				grpc.MaxCallSendMsgSize(1024*1024*20),
 			),
