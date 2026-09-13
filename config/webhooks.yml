@@ -1,4 +1,4 @@
-url: http://ai-engine-test:5000/webhook
+url: http://bot-engine:5000/webhook
 beforeSendSingleMsg:
   enable: false
   timeout: 5
