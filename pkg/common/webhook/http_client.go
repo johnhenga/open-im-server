@@ -57,25 +57,37 @@ func NewWebhookClient(url string, options ...*memamq.MemoryQueue) *Client {
 }
 
 func (c *Client) SyncPost(ctx context.Context, command string, req callbackstruct.CallbackReq, resp callbackstruct.CallbackResp, before *config.BeforeConfig) error {
-	return c.post(ctx, command, req, resp, before.Timeout)
+	return c.post(ctx, command, req, resp, before.Timeout, before.FailedContinue)
 }
 
 func (c *Client) AsyncPost(ctx context.Context, command string, req callbackstruct.CallbackReq, resp callbackstruct.CallbackResp, after *config.AfterConfig) {
 	if after.Enable {
-		c.queue.Push(func() { c.post(ctx, command, req, resp, after.Timeout) })
+		c.queue.Push(func() { c.post(ctx, command, req, resp, after.Timeout, false) })
 	}
 }
 
-func (c *Client) post(ctx context.Context, command string, input interface{}, output callbackstruct.CallbackResp, timeout int) error {
+// post calls the webhook. With failedContinue, a webhook that cannot be reached, times out or answers
+// with something that is not JSON is logged and treated as "continue", so an outage of the webhook
+// server does not fail the operation. A rejection the webhook sends on purpose (output.Parse) is
+// always returned.
+func (c *Client) post(ctx context.Context, command string, input interface{}, output callbackstruct.CallbackResp, timeout int, failedContinue bool) error {
 	ctx = mcontext.WithMustInfoCtx([]string{mcontext.GetOperationID(ctx), mcontext.GetOpUserID(ctx), mcontext.GetOpUserPlatform(ctx), mcontext.GetConnID(ctx)})
 	fullURL := c.url + "/" + command
 	log.ZInfo(ctx, "webhook", "url", fullURL, "input", input, "config", timeout)
 	operationID, _ := ctx.Value(constant.OperationID).(string)
 	b, err := c.client.Post(ctx, fullURL, map[string]string{constant.OperationID: operationID}, input, timeout)
 	if err != nil {
+		if failedContinue {
+			log.ZWarn(ctx, "webhook failed, continue", err, "url", fullURL)
+			return nil
+		}
 		return servererrs.ErrNetwork.WrapMsg(err.Error(), "post url", fullURL)
 	}
 	if err = json.Unmarshal(b, output); err != nil {
+		if failedContinue {
+			log.ZWarn(ctx, "webhook response format error, continue", err, "url", fullURL, "response", string(b))
+			return nil
+		}
 		return servererrs.ErrData.WithDetail(err.Error() + " response format error")
 	}
 	if err := output.Parse(); err != nil {
