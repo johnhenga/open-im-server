@@ -25,7 +25,7 @@ afterSendSingleMsg:
   timeout: 10
   # Only the senID/recvID specified in attentionIds will send the callback
   # if not set, all user messages will be callback
-  attentionIds: [bot10001]
+  attentionIds: [bot10001, bot7appmain]
   # See beforeSendSingleMsg comment.
   allowedTypes: []
   deniedTypes: []
