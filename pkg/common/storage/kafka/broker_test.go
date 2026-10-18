@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -99,6 +100,7 @@ type handlerForTest struct {
 	claims     map[int32]bool
 	reading    int
 	badHeader  string
+	onMessage  func(*sdkws.MsgData)
 }
 
 func newHandlerForTest(commitEach bool) *handlerForTest {
@@ -137,6 +139,9 @@ func (h *handlerForTest) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sa
 		ctx := GetContextWithMQHeader(msg.Headers)
 		h.mu.Lock()
 		h.got[data.ClientMsgID]++
+		if h.onMessage != nil {
+			h.onMessage(&data)
+		}
 		if mcontext.GetOperationID(ctx) != "op-"+data.ClientMsgID || mcontext.GetOpUserID(ctx) != "imAdmin" {
 			h.badHeader = fmt.Sprintf("%s: operationID %q opUserID %q", data.ClientMsgID, mcontext.GetOperationID(ctx), mcontext.GetOpUserID(ctx))
 		}
@@ -308,14 +313,22 @@ func TestBrokerSendThroughRestarts(t *testing.T) {
 	}
 	defer p.producer.Close()
 	var sent []string
-	failed := 0
+	failed, over100ms, over1s := 0, 0, 0
 	var longest time.Duration
 	for end := time.Now().Add(time.Duration(seconds) * time.Second); time.Now().Before(end); {
 		id := fmt.Sprintf("r%d", len(sent)+failed)
 		start := time.Now()
 		_, _, err := p.SendMessage(mcontext.SetOpUserID(mcontext.NewCtx("op-"+id), "imAdmin"), fmt.Sprintf("si_%d", (len(sent)+failed)%10), &sdkws.MsgData{ClientMsgID: id})
-		if d := time.Since(start); d > longest {
+		d := time.Since(start)
+		if d > longest {
 			longest = d
+		}
+		if d > 100*time.Millisecond {
+			over100ms++
+		}
+		if d > time.Second {
+			over1s++
+			t.Logf("%s slow send %s (err %v)", start.Format("15:04:05.000"), d.Round(time.Millisecond), err)
 		}
 		if err != nil {
 			failed++
@@ -336,8 +349,119 @@ func TestBrokerSendThroughRestarts(t *testing.T) {
 		return true
 	})
 	d, total := h.count("r")
-	t.Logf("sent %d, send failed %d, slowest send %s, received %d distinct, %d duplicate deliveries", len(sent), failed, longest.Round(time.Millisecond), d, total-d)
+	t.Logf("sent %d, send failed %d, sends over 100 ms %d, over 1 s %d, slowest send %s, received %d distinct, %d duplicate deliveries", len(sent), failed, over100ms, over1s, longest.Round(time.Millisecond), d, total-d)
 	if h.badHeader != "" {
 		t.Errorf("headers did not come back: %s", h.badHeader)
 	}
+}
+
+// Load steps for sizing a broker: OPENIM_TEST_KAFKA_LOAD is a comma list of records per second, each
+// held for OPENIM_TEST_KAFKA_LOAD_SECONDS (default 180). 64 goroutines share one producer, as
+// OpenIM's msg RPC shares one per topic; records are about 1 KB, the size stg's topics average. It
+// reports the send time (acks as producerAck) and the time from send to read by one group member.
+func TestBrokerLoad(t *testing.T) {
+	conf := brokerConfigForTest(t)
+	steps := os.Getenv("OPENIM_TEST_KAFKA_LOAD")
+	if steps == "" {
+		t.Skip("OPENIM_TEST_KAFKA_LOAD not set")
+	}
+	hold, _ := strconv.Atoi(os.Getenv("OPENIM_TEST_KAFKA_LOAD_SECONDS"))
+	if hold == 0 {
+		hold = 180
+	}
+	topic := createTopicForTest(t, conf)
+
+	var mu sync.Mutex
+	var e2e []time.Duration
+	h := newHandlerForTest(false)
+	h.onMessage = func(data *sdkws.MsgData) {
+		d := time.Since(time.UnixMicro(data.SendTime))
+		mu.Lock()
+		e2e = append(e2e, d)
+		mu.Unlock()
+	}
+	stop := startGroupForTest(t, conf, topic+"-group", topic, h, true)
+	defer stop()
+
+	kfk, err := BuildProducerConfig(*conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := NewKafkaProducer(kfk, conf.Addr, topic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.producer.Close()
+	pad := strings.Repeat("x", 900)
+
+	for _, s := range strings.Split(steps, ",") {
+		rate, _ := strconv.Atoi(s)
+		jobs := make(chan int, 10000)
+		var sendMu sync.Mutex
+		var sends []time.Duration
+		failed := 0
+		var wg sync.WaitGroup
+		for w := 0; w < 64; w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := range jobs {
+					id := fmt.Sprintf("l%d-%d", rate, i)
+					start := time.Now()
+					_, _, err := p.SendMessage(mcontext.SetOpUserID(mcontext.NewCtx("op-"+id), "imAdmin"), fmt.Sprintf("si_%d", i%1000),
+						&sdkws.MsgData{ClientMsgID: id, SendTime: start.UnixMicro(), Content: []byte(pad)})
+					d := time.Since(start)
+					sendMu.Lock()
+					if err != nil {
+						failed++
+					} else {
+						sends = append(sends, d)
+					}
+					sendMu.Unlock()
+				}
+			}()
+		}
+		mu.Lock()
+		e2e = e2e[:0]
+		mu.Unlock()
+		begin := time.Now()
+		tick := time.NewTicker(10 * time.Millisecond)
+		n, dropped := 0, 0
+		for now := range tick.C {
+			if now.Sub(begin) >= time.Duration(hold)*time.Second {
+				break
+			}
+			for want := int(now.Sub(begin).Seconds() * float64(rate)); n < want; n++ {
+				select {
+				case jobs <- n:
+				default:
+					dropped++ // the senders are behind: the producer cannot keep this rate
+				}
+			}
+		}
+		tick.Stop()
+		close(jobs)
+		wg.Wait()
+		end := time.Now()
+		time.Sleep(3 * time.Second) // let the reader catch up before counting
+		mu.Lock()
+		got := append([]time.Duration(nil), e2e...)
+		mu.Unlock()
+		t.Logf("STEP rate %d/s from %s to %s: sent %d (%.0f/s), failed %d, not sent (senders behind) %d, read %d | send p50 %s p95 %s p99 %s max %s | send-to-read p50 %s p95 %s p99 %s max %s",
+			rate, begin.UTC().Format("15:04:05"), end.UTC().Format("15:04:05"), len(sends), float64(len(sends))/end.Sub(begin).Seconds(), failed, dropped, len(got),
+			pct(sends, 50), pct(sends, 95), pct(sends, 99), pct(sends, 100), pct(got, 50), pct(got, 95), pct(got, 99), pct(got, 100))
+	}
+}
+
+func pct(d []time.Duration, p int) time.Duration {
+	if len(d) == 0 {
+		return 0
+	}
+	s := append([]time.Duration(nil), d...)
+	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
+	i := len(s) * p / 100
+	if i >= len(s) {
+		i = len(s) - 1
+	}
+	return s[i].Round(100 * time.Microsecond)
 }

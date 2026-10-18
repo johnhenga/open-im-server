@@ -28,7 +28,7 @@ type Config struct {
 	Password      string    `yaml:"password"`
 	SASLMechanism string    `yaml:"saslMechanism"`
 	ProducerAck   string    `yaml:"producerAck"`
-	CompressType string    `yaml:"compressType"`
-	Addr         []string  `yaml:"addr"`
-	TLS          TLSConfig `yaml:"tls"`
+	CompressType  string    `yaml:"compressType"`
+	Addr          []string  `yaml:"addr"`
+	TLS           TLSConfig `yaml:"tls"`
 }
