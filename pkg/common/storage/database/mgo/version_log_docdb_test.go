@@ -119,3 +119,25 @@ func TestVersionLogNoPipelineConcurrentWriters(t *testing.T) {
 		t.Fatalf("want %d entries with %d distinct versions, got %+v", writers+1, writers, doc.Logs)
 	}
 }
+
+func TestVersionLogNoPipelineFailureBetweenStepsChangesNothing(t *testing.T) {
+	vl, coll := versionLogForTest(t)
+	if !vl.txOK {
+		t.Skip("needs a replica set (transactions): run mongod with --replSet")
+	}
+	ctx := context.Background()
+	if _, err := vl.incrVersionResult(ctx, "g3", []string{"u1", "u2"}, model.VersionStateInsert); err != nil {
+		t.Fatal(err)
+	}
+	before := readDoc(t, coll, "g3")
+	boom := errors.New("stopped between the two updates")
+	versionLogBetweenSteps = func() error { return boom }
+	t.Cleanup(func() { versionLogBetweenSteps = nil })
+	if _, err := vl.incrVersionResult(ctx, "g3", []string{"u2"}, model.VersionStateDelete); !errors.Is(err, boom) {
+		t.Fatalf("want the injected error, got %v", err)
+	}
+	after := readDoc(t, coll, "g3")
+	if after.Version != before.Version || len(after.Logs) != len(before.Logs) {
+		t.Fatalf("a failed write changed the document: before %+v, after %+v", before, after)
+	}
+}

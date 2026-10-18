@@ -22,12 +22,22 @@ func NewVersionLog(coll *mongo.Collection) (database.VersionLog, error) {
 	if err := lm.initIndex(context.Background()); err != nil {
 		return nil, errs.WrapMsg(err, "init version log index failed", "coll", coll.Name())
 	}
+	// Transactions need a replica set (DocumentDB counts as one); a single mongod has none.
+	var hello bson.M
+	if err := coll.Database().Client().Database("admin").RunCommand(context.Background(), bson.M{"isMaster": 1}).Decode(&hello); err != nil {
+		return nil, errs.WrapMsg(err, "check whether mongo supports transactions", "coll", coll.Name())
+	}
+	_, lm.txOK = hello["setName"]
 	return lm, nil
 }
 
 type VersionLogMgo struct {
 	coll *mongo.Collection
+	txOK bool // the server takes transactions (writeLogBatch2 runs its two updates in one)
 }
+
+// versionLogBetweenSteps runs between writeLogBatch2's two updates. Tests only: nil in the server.
+var versionLogBetweenSteps func() error
 
 func (l *VersionLogMgo) initIndex(ctx context.Context) error {
 	_, err := l.coll.Indexes().CreateOne(ctx, mongo.IndexModel{
@@ -100,12 +110,34 @@ func (l *VersionLogMgo) initDoc(ctx context.Context, dId string, eIds []string, 
 
 // writeLogBatch2 bumps the document's version and records eIds at the new version, replacing any
 // older entry for them. Upstream does this in one findOneAndUpdate with an aggregation pipeline, which
-// Amazon DocumentDB refuses ("Pipeline based document update", 2026-10-18). Here it is two plain updates:
-// remove the older entries and read the version, then add 1 to the version and append the entries only
-// if the version is still the one read (retried when another write came between). A reader between the
-// two sees the old version without those entries, so no client skips a change. Returns
-// mongo.ErrNoDocuments when the document does not exist, as before.
+// Amazon DocumentDB refuses ("Pipeline based document update", 2026-10-18). Here it is two plain updates
+// (writeLogSteps), run in one transaction so that they commit together, as the single update did: a
+// failure between them must not leave the older entries removed and the new ones missing, or a client
+// that syncs by version would never learn of the change. A caller's own transaction (group creation)
+// already covers them; without transaction support (a single mongod) they run as two updates.
+// Returns mongo.ErrNoDocuments when the document does not exist, as before.
 func (l *VersionLogMgo) writeLogBatch2(ctx context.Context, dId string, eIds []string, state int32, now time.Time) (*model.VersionLog, error) {
+	if mongo.SessionFromContext(ctx) != nil || !l.txOK {
+		return l.writeLogSteps(ctx, dId, eIds, state, now)
+	}
+	sess, err := l.coll.Database().Client().StartSession()
+	if err != nil {
+		return nil, errs.WrapMsg(err, "version log start session")
+	}
+	defer sess.EndSession(ctx)
+	res, err := sess.WithTransaction(ctx, func(sctx mongo.SessionContext) (any, error) {
+		return l.writeLogSteps(sctx, dId, eIds, state, now)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res.(*model.VersionLog), nil
+}
+
+// writeLogSteps: remove the older entries and read the version, then add 1 to the version and append
+// the entries only if the version is still the one read. Outside a transaction a write that came
+// between makes it read again; inside one the first update holds the document, so it cannot.
+func (l *VersionLogMgo) writeLogSteps(ctx context.Context, dId string, eIds []string, state int32, now time.Time) (*model.VersionLog, error) {
 	if eIds == nil {
 		eIds = []string{}
 	}
@@ -117,6 +149,11 @@ func (l *VersionLogMgo) writeLogBatch2(ctx context.Context, dId string, eIds []s
 			options.FindOneAndUpdate().SetUpsert(false).SetReturnDocument(options.After).SetProjection(projection))
 		if err != nil {
 			return nil, err
+		}
+		if versionLogBetweenSteps != nil {
+			if err := versionLogBetweenSteps(); err != nil {
+				return nil, err
+			}
 		}
 		next := pulled.Version + 1
 		elems := make([]model.VersionLogElem, 0, len(eIds))
