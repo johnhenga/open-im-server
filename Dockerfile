@@ -6,7 +6,7 @@
 # Build (--provenance=false --sbom=false: the tag is then the image itself, so the digest the chart
 # pins is the digest Inspector scans):
 #   docker buildx build --platform linux/amd64 --provenance=false --sbom=false -t <repo>:openim-server-v-<sha> --push .
-FROM golang:1.25-alpine@sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59 AS builder
+FROM golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS builder
 
 WORKDIR /openim-server
 COPY go.mod go.sum ./
