@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/openimsdk/open-im-server/v3/pkg/rpcli"
-	"github.com/openimsdk/tools/s3/aws"
 	"github.com/openimsdk/tools/s3/disable"
 
 	"google.golang.org/grpc"
@@ -29,6 +28,7 @@ import (
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/cache/redis"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/controller"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database/mgo"
+	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/s3aws"
 	"github.com/openimsdk/open-im-server/v3/pkg/localcache"
 	"github.com/openimsdk/protocol/third"
 	"github.com/openimsdk/tools/db/mongoutil"
@@ -95,7 +95,8 @@ func Start(ctx context.Context, config *Config, client discovery.SvcDiscoveryReg
 	case "kodo":
 		o, err = kodo.NewKodo(*config.RpcConfig.Object.Kodo.Build())
 	case "aws":
-		o, err = aws.NewAws(*config.RpcConfig.Object.Aws.Build())
+		// our copy: signs with the pod IAM role when no access key is set
+		o, err = s3aws.NewAws(ctx, *config.RpcConfig.Object.Aws.Build())
 	case "":
 		o = disable.NewDisable()
 	default:
@@ -112,7 +113,7 @@ func Start(ctx context.Context, config *Config, client discovery.SvcDiscoveryReg
 	third.RegisterThirdServer(server, &thirdServer{
 		thirdDatabase: controller.NewThirdDatabase(redis.NewThirdCache(rdb), logdb),
 		s3dataBase:    controller.NewS3Database(rdb, o, s3db),
-		defaultExpire: time.Hour * 24 * 7,
+		defaultExpire: time.Hour, // upstream 7 days; a leaked signed link now dies within the hour
 		config:        config,
 		s3:            o,
 		userClient:    rpcli.NewUserClient(userConn),

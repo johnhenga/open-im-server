@@ -14,10 +14,10 @@ import (
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/cache/redis"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database/mgo"
+	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/s3aws"
 	"github.com/openimsdk/tools/db/mongoutil"
 	"github.com/openimsdk/tools/db/redisutil"
 	"github.com/openimsdk/tools/s3"
-	"github.com/openimsdk/tools/s3/aws"
 	"github.com/openimsdk/tools/s3/cos"
 	"github.com/openimsdk/tools/s3/kodo"
 	"github.com/openimsdk/tools/s3/minio"
@@ -65,7 +65,7 @@ func getS3(path string, name string, thirdConf *config.Third) (s3.Interface, err
 	case "kodo":
 		return kodo.NewKodo(*thirdConf.Object.Kodo.Build())
 	case "aws":
-		return aws.NewAws(*thirdConf.Object.Aws.Build())
+		return s3aws.NewAws(context.Background(), *thirdConf.Object.Aws.Build())
 	default:
 		return nil, fmt.Errorf("invalid object enable: %s", name)
 	}
