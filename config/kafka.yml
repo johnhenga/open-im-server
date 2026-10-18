@@ -2,6 +2,8 @@
 username: ''
 # Password for authentication
 password: ''
+# SASL mechanism when a username or password is set: PLAIN (default), SCRAM-SHA-256 or SCRAM-SHA-512
+saslMechanism: ''
 # Producer acknowledgment settings
 producerAck: 
 # Compression type to use (e.g., none, gzip, snappy)

@@ -14,10 +14,8 @@ func BuildConsumerGroupConfig(conf *Config, initial int64, autoCommitEnable bool
 	kfk.Consumer.Offsets.Initial = initial
 	kfk.Consumer.Offsets.AutoCommit.Enable = autoCommitEnable
 	kfk.Consumer.Return.Errors = false
-	if conf.Username != "" || conf.Password != "" {
-		kfk.Net.SASL.Enable = true
-		kfk.Net.SASL.User = conf.Username
-		kfk.Net.SASL.Password = conf.Password
+	if err := setSASL(kfk, conf); err != nil {
+		return nil, err
 	}
 	if conf.TLS.EnableTLS {
 		tls, err := newTLSConfig(conf.TLS.ClientCrt, conf.TLS.ClientKey, conf.TLS.CACrt, []byte(conf.TLS.ClientKeyPwd), conf.TLS.InsecureSkipVerify)
@@ -43,10 +41,8 @@ func BuildProducerConfig(conf Config) (*sarama.Config, error) {
 	kfk.Producer.Return.Successes = true
 	kfk.Producer.Return.Errors = true
 	kfk.Producer.Partitioner = sarama.NewHashPartitioner
-	if conf.Username != "" || conf.Password != "" {
-		kfk.Net.SASL.Enable = true
-		kfk.Net.SASL.User = conf.Username
-		kfk.Net.SASL.Password = conf.Password
+	if err := setSASL(kfk, &conf); err != nil {
+		return nil, err
 	}
 	switch strings.ToLower(conf.ProducerAck) {
 	case "no_response":

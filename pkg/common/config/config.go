@@ -77,6 +77,7 @@ type Mongo struct {
 type Kafka struct {
 	Username           string   `mapstructure:"username"`
 	Password           string   `mapstructure:"password"`
+	SASLMechanism      string   `mapstructure:"saslMechanism"`
 	ProducerAck        string   `mapstructure:"producerAck"`
 	CompressType       string   `mapstructure:"compressType"`
 	Address            []string `mapstructure:"address"`
@@ -534,11 +535,12 @@ func (r *Redis) Build() *redisutil.Config {
 
 func (k *Kafka) Build() *kafka.Config {
 	return &kafka.Config{
-		Username:     k.Username,
-		Password:     k.Password,
-		ProducerAck:  k.ProducerAck,
-		CompressType: k.CompressType,
-		Addr:         k.Address,
+		Username:      k.Username,
+		Password:      k.Password,
+		SASLMechanism: k.SASLMechanism,
+		ProducerAck:   k.ProducerAck,
+		CompressType:  k.CompressType,
+		Addr:          k.Address,
 		TLS: kafka.TLSConfig{
 			EnableTLS:          k.Tls.EnableTLS,
 			CACrt:              k.Tls.CACrt,
