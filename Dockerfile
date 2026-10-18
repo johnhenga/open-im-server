@@ -1,49 +1,29 @@
-# Use Go 1.22 Alpine as the base image for building the application
-FROM golang:1.25-alpine AS builder
+# OpenIM server: one image holds the program of every service. Kubernetes starts each service by
+# running its program directly (the chart's command: <global.binaryPath>/openim-<service> -i 0 -c /config/),
+# so the image holds only the programs: no Go toolchain, no mage, no shell, no package manager.
+# It runs as a non-root user. Config, TLS CA files and secrets are mounted by the chart.
+#
+# Build (--provenance=false --sbom=false: the tag is then the image itself, so the digest the chart
+# pins is the digest Inspector scans):
+#   docker buildx build --platform linux/amd64 --provenance=false --sbom=false -t <repo>:openim-server-v-<sha> --push .
+FROM golang:1.25-alpine@sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59 AS builder
 
-# Define the base directory for the application as an environment variable
-ENV SERVER_DIR=/openim-server
-
-# Set the working directory inside the container based on the environment variable
-WORKDIR $SERVER_DIR
-
-# Set the Go proxy to improve dependency resolution speed
-# ENV GOPROXY=https://goproxy.io,direct
-
-# Copy all files from the current directory into the container
+WORKDIR /openim-server
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
 
-RUN go mod download
+# Static programs (no C library) without debug data: the same flags as `mage build` in release mode.
+RUN mkdir /out && for d in cmd/openim-api cmd/openim-cmdutils cmd/openim-crontask cmd/openim-msggateway \
+      cmd/openim-msgtransfer cmd/openim-push cmd/openim-rpc/openim-rpc-*; do \
+      CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/$(basename $d) ./$d || exit 1; \
+    done
 
-# Install Mage to use for building the application
-RUN go install github.com/magefile/mage@v1.15.0
+# distroless static: CA certificates and time zone data, nothing else.
+FROM gcr.io/distroless/static:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 
-# Optionally build your application if needed
-RUN mage build
+# The same path as the old image, so the chart's global.binaryPath does not change.
+COPY --from=builder /out/ /openim-server/_output/bin/platforms/linux/amd64/
 
-# Using Alpine Linux with Go environment for the final image
-FROM golang:1.25-alpine
-
-# Install necessary packages, such as bash
-RUN apk add --no-cache bash
-
-# Set the environment and work directory
-ENV SERVER_DIR=/openim-server
-WORKDIR $SERVER_DIR
-
-
-# Copy the compiled binaries and mage from the builder image to the final image
-COPY --from=builder $SERVER_DIR/_output $SERVER_DIR/_output
-COPY --from=builder $SERVER_DIR/config $SERVER_DIR/config
-COPY --from=builder /go/bin/mage /usr/local/bin/mage
-COPY --from=builder $SERVER_DIR/magefile_windows.go $SERVER_DIR/
-COPY --from=builder $SERVER_DIR/magefile_unix.go $SERVER_DIR/
-COPY --from=builder $SERVER_DIR/magefile.go $SERVER_DIR/
-COPY --from=builder $SERVER_DIR/start-config.yml $SERVER_DIR/
-COPY --from=builder $SERVER_DIR/go.mod $SERVER_DIR/
-COPY --from=builder $SERVER_DIR/go.sum $SERVER_DIR/
-
-RUN go get github.com/openimsdk/gomake@v0.0.15-alpha.5
-
-# Set the command to run when the container starts
-ENTRYPOINT ["sh", "-c", "mage start && tail -f /dev/null"]
+# 65532 is distroless's nonroot user. A number, so Kubernetes can check runAsNonRoot.
+USER 65532:65532
