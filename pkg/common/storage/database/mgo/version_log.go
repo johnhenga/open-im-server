@@ -98,81 +98,48 @@ func (l *VersionLogMgo) initDoc(ctx context.Context, dId string, eIds []string, 
 	return wl.VersionLog(), nil
 }
 
+// writeLogBatch2 bumps the document's version and records eIds at the new version, replacing any
+// older entry for them. Upstream does this in one findOneAndUpdate with an aggregation pipeline, which
+// Amazon DocumentDB refuses ("Pipeline based document update", 2026-10-18). Here it is two plain updates:
+// remove the older entries and read the version, then add 1 to the version and append the entries only
+// if the version is still the one read (retried when another write came between). A reader between the
+// two sees the old version without those entries, so no client skips a change. Returns
+// mongo.ErrNoDocuments when the document does not exist, as before.
 func (l *VersionLogMgo) writeLogBatch2(ctx context.Context, dId string, eIds []string, state int32, now time.Time) (*model.VersionLog, error) {
 	if eIds == nil {
 		eIds = []string{}
 	}
-	filter := bson.M{
-		"d_id": dId,
-	}
-	elems := make([]bson.M, 0, len(eIds))
-	for _, eId := range eIds {
-		elems = append(elems, bson.M{
-			"e_id":        eId,
-			"version":     "$version",
-			"state":       state,
-			"last_update": now,
-		})
-	}
-	pipeline := []bson.M{
-		{
-			"$addFields": bson.M{
-				"delete_e_ids": eIds,
+	projection := bson.M{"logs": 0}
+	for attempt := 0; attempt < 10; attempt++ {
+		pulled, err := mongoutil.FindOneAndUpdate[*model.VersionLog](ctx, l.coll,
+			bson.M{"d_id": dId},
+			bson.M{"$pull": bson.M{"logs": bson.M{"e_id": bson.M{"$in": eIds}}}},
+			options.FindOneAndUpdate().SetUpsert(false).SetReturnDocument(options.After).SetProjection(projection))
+		if err != nil {
+			return nil, err
+		}
+		next := pulled.Version + 1
+		elems := make([]model.VersionLogElem, 0, len(eIds))
+		for _, eId := range eIds {
+			elems = append(elems, model.VersionLogElem{EID: eId, Version: next, State: state, LastUpdate: now})
+		}
+		res, err := mongoutil.FindOneAndUpdate[*model.VersionLog](ctx, l.coll,
+			bson.M{"d_id": dId, "version": pulled.Version},
+			bson.M{
+				"$set":  bson.M{"version": next, "last_update": now},
+				"$push": bson.M{"logs": bson.M{"$each": elems}},
 			},
-		},
-		{
-			"$set": bson.M{
-				"version":     bson.M{"$add": []any{"$version", 1}},
-				"last_update": now,
-			},
-		},
-		{
-			"$set": bson.M{
-				"logs": bson.M{
-					"$filter": bson.M{
-						"input": "$logs",
-						"as":    "log",
-						"cond": bson.M{
-							"$not": bson.M{
-								"$in": []any{"$$log.e_id", "$delete_e_ids"},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			"$set": bson.M{
-				"logs": bson.M{
-					"$concatArrays": []any{
-						"$logs",
-						elems,
-					},
-				},
-			},
-		},
-		{
-			"$unset": "delete_e_ids",
-		},
+			options.FindOneAndUpdate().SetUpsert(false).SetReturnDocument(options.After).SetProjection(projection))
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			continue // another write changed the version between the two updates: read it again
+		}
+		if err != nil {
+			return nil, err
+		}
+		res.Logs = elems
+		return res, nil
 	}
-	projection := bson.M{
-		"logs": 0,
-	}
-	opt := options.FindOneAndUpdate().SetUpsert(false).SetReturnDocument(options.After).SetProjection(projection)
-	res, err := mongoutil.FindOneAndUpdate[*model.VersionLog](ctx, l.coll, filter, pipeline, opt)
-	if err != nil {
-		return nil, err
-	}
-	res.Logs = make([]model.VersionLogElem, 0, len(eIds))
-	for _, id := range eIds {
-		res.Logs = append(res.Logs, model.VersionLogElem{
-			EID:        id,
-			State:      state,
-			Version:    res.Version,
-			LastUpdate: res.LastUpdate,
-		})
-	}
-	return res, nil
+	return nil, errs.WrapMsg(errors.New("version log write kept losing to concurrent writes"), "writeLogBatch2", "dId", dId)
 }
 
 func (l *VersionLogMgo) findDoc(ctx context.Context, dId string) (*model.VersionLog, error) {
