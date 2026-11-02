@@ -271,8 +271,9 @@ func (g *groupDatabase) UpdateGroup(ctx context.Context, groupID string, data ma
 }
 
 func (g *groupDatabase) DismissGroup(ctx context.Context, groupID string, deleteMember bool) error {
-	return g.ctxTx.Transaction(ctx, func(ctx context.Context) error {
-		c := g.cache.CloneGroupCache()
+	var c cache.GroupCache
+	if err := g.ctxTx.Transaction(ctx, func(ctx context.Context) error {
+		c = g.cache.CloneGroupCache()
 		if err := g.groupDB.UpdateStatus(ctx, groupID, constant.GroupStatusDismissed); err != nil {
 			return err
 		}
@@ -303,8 +304,13 @@ func (g *groupDatabase) DismissGroup(ctx context.Context, groupID string, delete
 			}
 			c = c.DelMaxGroupMemberVersion(groupID)
 		}
-		return c.DelGroupsInfo(groupID).ChainExecDel(ctx)
-	})
+		c = c.DelGroupsInfo(groupID)
+		return nil
+	}); err != nil {
+		return err
+	}
+	// After commit, as in CreateGroup: a read inside the transaction would cache the group as still open.
+	return c.ChainExecDel(postCommitCtx(ctx))
 }
 
 func (g *groupDatabase) TakeGroupMember(ctx context.Context, groupID string, userID string) (*model.GroupMember, error) {
@@ -438,23 +444,29 @@ func (g *groupDatabase) UpdateGroupMember(ctx context.Context, groupID string, u
 	if len(data) == 0 {
 		return nil
 	}
-	return g.ctxTx.Transaction(ctx, func(ctx context.Context) error {
+	var c cache.GroupCache
+	if err := g.ctxTx.Transaction(ctx, func(ctx context.Context) error {
 		if err := g.groupMemberDB.Update(ctx, groupID, userID, data); err != nil {
 			return err
 		}
-		c := g.cache.CloneGroupCache()
+		c = g.cache.CloneGroupCache()
 		c = c.DelGroupMembersInfo(groupID, userID)
 		if g.groupMemberDB.IsUpdateRoleLevel(data) {
 			c = c.DelGroupAllRoleLevel(groupID).DelGroupMemberIDs(groupID)
 		}
 		c = c.DelMaxGroupMemberVersion(groupID)
-		return c.ChainExecDel(ctx)
-	})
+		return nil
+	}); err != nil {
+		return err
+	}
+	// After commit, as in CreateGroup: a read inside the transaction would cache the old member info.
+	return c.ChainExecDel(postCommitCtx(ctx))
 }
 
 func (g *groupDatabase) UpdateGroupMembers(ctx context.Context, data []*common.BatchUpdateGroupMember) error {
-	return g.ctxTx.Transaction(ctx, func(ctx context.Context) error {
-		c := g.cache.CloneGroupCache()
+	var c cache.GroupCache
+	if err := g.ctxTx.Transaction(ctx, func(ctx context.Context) error {
+		c = g.cache.CloneGroupCache()
 		for _, item := range data {
 			if err := g.groupMemberDB.Update(ctx, item.GroupID, item.UserID, item.Map); err != nil {
 				return err
@@ -464,8 +476,12 @@ func (g *groupDatabase) UpdateGroupMembers(ctx context.Context, data []*common.B
 			}
 			c = c.DelGroupMembersInfo(item.GroupID, item.UserID).DelMaxGroupMemberVersion(item.GroupID).DelGroupMembersHash(item.GroupID)
 		}
-		return c.ChainExecDel(ctx)
-	})
+		return nil
+	}); err != nil {
+		return err
+	}
+	// After commit, as in CreateGroup: a read inside the transaction would cache the old member info.
+	return c.ChainExecDel(postCommitCtx(ctx))
 }
 
 func (g *groupDatabase) CreateGroupRequest(ctx context.Context, requests []*model.GroupRequest) error {

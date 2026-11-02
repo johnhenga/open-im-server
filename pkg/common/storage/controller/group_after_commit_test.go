@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/common"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
 	"github.com/stretchr/testify/assert"
@@ -16,19 +17,45 @@ import (
 
 type afterCommitGroupDB struct {
 	database.Group
-	updateMap func(context.Context, string, map[string]any) error
+	updateMap    func(context.Context, string, map[string]any) error
+	updateStatus func(context.Context, string, int32) error
 }
 
 func (db afterCommitGroupDB) UpdateMap(ctx context.Context, groupID string, args map[string]any) error {
 	return db.updateMap(ctx, groupID, args)
 }
 
+func (db afterCommitGroupDB) UpdateStatus(ctx context.Context, groupID string, status int32) error {
+	return db.updateStatus(ctx, groupID, status)
+}
+
 type afterCommitMemberDB struct {
 	database.GroupMember
-	create func(context.Context, []*model.GroupMember) error
-	incr   func(context.Context, string, []string, int32) error
-	delete func(context.Context, string, []string) error
+	create    func(context.Context, []*model.GroupMember) error
+	incr      func(context.Context, string, []string, int32) error
+	delete    func(context.Context, string, []string) error
+	update    func(context.Context, string, string, map[string]any) error
+	joinIncr  func(context.Context, string, []string, int32) error
+	roleLevel bool
 }
+
+func (db afterCommitMemberDB) Update(ctx context.Context, groupID string, userID string, data map[string]any) error {
+	return db.update(ctx, groupID, userID, data)
+}
+
+func (db afterCommitMemberDB) IsUpdateRoleLevel(map[string]any) bool { return db.roleLevel }
+
+func (db afterCommitMemberDB) JoinGroupIncrVersion(ctx context.Context, userID string, groupIDs []string, state int32) error {
+	return db.joinIncr(ctx, userID, groupIDs, state)
+}
+
+// dismissCache answers DismissGroup's member read inside the transaction.
+type dismissCache struct {
+	*createGroupTestCache
+	ids []string
+}
+
+func (c dismissCache) GetGroupMemberIDs(context.Context, string) ([]string, error) { return c.ids, nil }
 
 func (db afterCommitMemberDB) Create(ctx context.Context, members []*model.GroupMember) error {
 	return db.create(ctx, members)
@@ -152,6 +179,81 @@ func TestUpdateAndDeleteDoNotInvalidateOnFailure(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			n, err := runAfterCommit(t, tt.write, tt.db, tt.commitErr)
 			require.ErrorIs(t, err, tt.wantErr)
+			assert.Zero(t, n)
+		})
+	}
+}
+
+func TestMemberUpdatesAndDismissInvalidateAfterCommit(t *testing.T) {
+	update := func(context.Context, string, string, map[string]any) error { return nil }
+	ok := func(context.Context, string, []string, int32) error { return nil }
+	for _, tt := range []struct {
+		name  string
+		db    *groupDatabase
+		write func(*groupDatabase, context.Context) error
+	}{
+		{name: "update member",
+			db: &groupDatabase{groupMemberDB: afterCommitMemberDB{update: update}},
+			write: func(db *groupDatabase, ctx context.Context) error {
+				return db.UpdateGroupMember(ctx, "group", "member", map[string]any{"ex": "{}"})
+			}},
+		{name: "update member role level",
+			db: &groupDatabase{groupMemberDB: afterCommitMemberDB{update: update, roleLevel: true}},
+			write: func(db *groupDatabase, ctx context.Context) error {
+				return db.UpdateGroupMember(ctx, "group", "member", map[string]any{"role_level": 60})
+			}},
+		{name: "update members",
+			db: &groupDatabase{groupMemberDB: afterCommitMemberDB{update: update}},
+			write: func(db *groupDatabase, ctx context.Context) error {
+				return db.UpdateGroupMembers(ctx, []*common.BatchUpdateGroupMember{
+					{GroupID: "group", UserID: "a", Map: map[string]any{"ex": "{}"}},
+					{GroupID: "group", UserID: "b", Map: map[string]any{"ex": "{}"}},
+				})
+			}},
+		{name: "dismiss, keep members",
+			db: &groupDatabase{
+				groupDB:       afterCommitGroupDB{updateStatus: func(context.Context, string, int32) error { return nil }},
+				groupMemberDB: afterCommitMemberDB{incr: ok}},
+			write: func(db *groupDatabase, ctx context.Context) error { return db.DismissGroup(ctx, "group", false) }},
+		{name: "dismiss, delete members",
+			db: &groupDatabase{
+				groupDB:       afterCommitGroupDB{updateStatus: func(context.Context, string, int32) error { return nil }},
+				groupMemberDB: afterCommitMemberDB{delete: func(context.Context, string, []string) error { return nil }, joinIncr: ok}},
+			write: func(db *groupDatabase, ctx context.Context) error {
+				db.cache = dismissCache{createGroupTestCache: db.cache.(*createGroupTestCache), ids: []string{"a", "b"}}
+				return db.DismissGroup(ctx, "group", true)
+			}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			n, err := runAfterCommit(t, tt.write, tt.db, nil)
+			require.NoError(t, err)
+			assert.Equal(t, 1, n)
+		})
+	}
+}
+
+func TestMemberUpdatesAndDismissDoNotInvalidateOnFailure(t *testing.T) {
+	writeErr := errors.New("write failed")
+	fail := func(context.Context, string, string, map[string]any) error { return writeErr }
+	for _, tt := range []struct {
+		name  string
+		db    *groupDatabase
+		write func(*groupDatabase, context.Context) error
+	}{
+		{name: "update member", db: &groupDatabase{groupMemberDB: afterCommitMemberDB{update: fail}},
+			write: func(db *groupDatabase, ctx context.Context) error {
+				return db.UpdateGroupMember(ctx, "group", "member", map[string]any{"ex": "{}"})
+			}},
+		{name: "update members", db: &groupDatabase{groupMemberDB: afterCommitMemberDB{update: fail}},
+			write: func(db *groupDatabase, ctx context.Context) error {
+				return db.UpdateGroupMembers(ctx, []*common.BatchUpdateGroupMember{{GroupID: "group", UserID: "a", Map: map[string]any{"ex": "{}"}}})
+			}},
+		{name: "dismiss", db: &groupDatabase{groupDB: afterCommitGroupDB{updateStatus: func(context.Context, string, int32) error { return writeErr }}},
+			write: func(db *groupDatabase, ctx context.Context) error { return db.DismissGroup(ctx, "group", false) }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			n, err := runAfterCommit(t, tt.write, tt.db, nil)
+			require.ErrorIs(t, err, writeErr)
 			assert.Zero(t, n)
 		})
 	}
