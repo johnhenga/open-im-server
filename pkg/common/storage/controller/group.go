@@ -223,7 +223,14 @@ func (g *groupDatabase) CreateGroup(ctx context.Context, groups []*model.Group, 
 		return err
 	}
 	// Invalidate after commit so concurrent readers cannot cache the old membership.
-	return c.ChainExecDel(ctx)
+	return c.ChainExecDel(postCommitCtx(ctx))
+}
+
+// postCommitCtx is the context for cache invalidation after a transaction committed: the caller's
+// values (operation id, logging) without its cancellation. A request cancelled between the commit and
+// the invalidation must not leave the committed change behind a stale cache.
+func postCommitCtx(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
 }
 
 func (g *groupDatabase) FindGroupMemberUserID(ctx context.Context, groupID string) ([]string, error) {
@@ -251,15 +258,16 @@ func (g *groupDatabase) SearchGroup(ctx context.Context, keyword string, paginat
 }
 
 func (g *groupDatabase) UpdateGroup(ctx context.Context, groupID string, data map[string]any) error {
-	return g.ctxTx.Transaction(ctx, func(ctx context.Context) error {
+	if err := g.ctxTx.Transaction(ctx, func(ctx context.Context) error {
 		if err := g.groupDB.UpdateMap(ctx, groupID, data); err != nil {
 			return err
 		}
-		if err := g.groupMemberDB.MemberGroupIncrVersion(ctx, groupID, []string{""}, model.VersionStateUpdate); err != nil {
-			return err
-		}
-		return g.cache.CloneGroupCache().DelGroupsInfo(groupID).DelMaxGroupMemberVersion(groupID).ChainExecDel(ctx)
-	})
+		return g.groupMemberDB.MemberGroupIncrVersion(ctx, groupID, []string{""}, model.VersionStateUpdate)
+	}); err != nil {
+		return err
+	}
+	// After commit, as in CreateGroup: a read inside the transaction would cache the old group info.
+	return g.cache.CloneGroupCache().DelGroupsInfo(groupID).DelMaxGroupMemberVersion(groupID).ChainExecDel(postCommitCtx(ctx))
 }
 
 func (g *groupDatabase) DismissGroup(ctx context.Context, groupID string, deleteMember bool) error {
@@ -377,21 +385,22 @@ func (g *groupDatabase) HandlerGroupRequest(ctx context.Context, groupID string,
 }
 
 func (g *groupDatabase) DeleteGroupMember(ctx context.Context, groupID string, userIDs []string) error {
-	return g.ctxTx.Transaction(ctx, func(ctx context.Context) error {
-		if err := g.groupMemberDB.Delete(ctx, groupID, userIDs); err != nil {
-			return err
-		}
-		c := g.cache.CloneGroupCache()
-		return c.DelGroupMembersHash(groupID).
-			DelGroupMemberIDs(groupID).
-			DelGroupsMemberNum(groupID).
-			DelJoinedGroupID(userIDs...).
-			DelGroupMembersInfo(groupID, userIDs...).
-			DelGroupAllRoleLevel(groupID).
-			DelMaxGroupMemberVersion(groupID).
-			DelMaxJoinGroupVersion(userIDs...).
-			ChainExecDel(ctx)
-	})
+	if err := g.ctxTx.Transaction(ctx, func(ctx context.Context) error {
+		return g.groupMemberDB.Delete(ctx, groupID, userIDs)
+	}); err != nil {
+		return err
+	}
+	// After commit, as in CreateGroup: a read inside the transaction would cache the removed members,
+	// and they would keep receiving the group's messages.
+	return g.cache.CloneGroupCache().DelGroupMembersHash(groupID).
+		DelGroupMemberIDs(groupID).
+		DelGroupsMemberNum(groupID).
+		DelJoinedGroupID(userIDs...).
+		DelGroupMembersInfo(groupID, userIDs...).
+		DelGroupAllRoleLevel(groupID).
+		DelMaxGroupMemberVersion(groupID).
+		DelMaxJoinGroupVersion(userIDs...).
+		ChainExecDel(postCommitCtx(ctx))
 }
 
 func (g *groupDatabase) MapGroupMemberUserID(ctx context.Context, groupIDs []string) (map[string]*common.GroupSimpleUserID, error) {
