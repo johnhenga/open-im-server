@@ -93,7 +93,8 @@ type conversationDatabase struct {
 }
 
 func (c *conversationDatabase) SetUsersConversationFieldTx(ctx context.Context, userIDs []string, conversation *relationtb.Conversation, fieldMap map[string]any) (err error) {
-	return c.tx.Transaction(ctx, func(ctx context.Context) error {
+	var del cache.ConversationCache
+	if err := c.tx.Transaction(ctx, func(ctx context.Context) error {
 		cache := c.cache.CloneConversationCache()
 		if conversation.GroupID != "" {
 			cache = cache.DelSuperGroupRecvMsgNotNotifyUserIDs(conversation.GroupID).DelSuperGroupRecvMsgNotNotifyUserIDsHash(conversation.GroupID)
@@ -142,8 +143,14 @@ func (c *conversationDatabase) SetUsersConversationFieldTx(ctx context.Context, 
 			}
 			cache = cache.DelConversationIDs(NotUserIDs...).DelUserConversationIDsHash(NotUserIDs...).DelConversations(conversation.ConversationID, NotUserIDs...)
 		}
-		return cache.ChainExecDel(ctx)
-	})
+		del = cache
+		return nil
+	}); err != nil {
+		return err
+	}
+	// Invalidate after commit, as in groupDatabase.CreateGroup: a read inside the transaction would
+	// cache the old conversation list (a new group member's room missing from it for 12 hours).
+	return del.ChainExecDel(postCommitCtx(ctx))
 }
 
 func (c *conversationDatabase) UpdateUsersConversationField(ctx context.Context, userIDs []string, conversationID string, args map[string]any) error {
@@ -194,7 +201,8 @@ func (c *conversationDatabase) CreateConversation(ctx context.Context, conversat
 }
 
 func (c *conversationDatabase) SyncPeerUserPrivateConversationTx(ctx context.Context, conversations []*relationtb.Conversation) error {
-	return c.tx.Transaction(ctx, func(ctx context.Context) error {
+	var del cache.ConversationCache
+	if err := c.tx.Transaction(ctx, func(ctx context.Context) error {
 		cache := c.cache.CloneConversationCache()
 		for _, conversation := range conversations {
 			cache = cache.DelConversationVersionUserIDs(conversation.OwnerUserID, conversation.UserID)
@@ -224,8 +232,14 @@ func (c *conversationDatabase) SyncPeerUserPrivateConversationTx(ctx context.Con
 				}
 			}
 		}
-		return cache.ChainExecDel(ctx)
-	})
+		del = cache
+		return nil
+	}); err != nil {
+		return err
+	}
+	// Invalidate after commit, as in groupDatabase.CreateGroup: a read inside the transaction would
+	// cache the old conversation list (a new group member's room missing from it for 12 hours).
+	return del.ChainExecDel(postCommitCtx(ctx))
 }
 
 func (c *conversationDatabase) FindConversations(ctx context.Context, ownerUserID string, conversationIDs []string) ([]*relationtb.Conversation, error) {
@@ -241,7 +255,8 @@ func (c *conversationDatabase) GetUserAllConversation(ctx context.Context, owner
 }
 
 func (c *conversationDatabase) SetUserConversations(ctx context.Context, ownerUserID string, conversations []*relationtb.Conversation) error {
-	return c.tx.Transaction(ctx, func(ctx context.Context) error {
+	var del cache.ConversationCache
+	if err := c.tx.Transaction(ctx, func(ctx context.Context) error {
 		cache := c.cache.CloneConversationCache()
 		cache = cache.DelConversationVersionUserIDs(ownerUserID).
 			DelConversationNotNotifyMessageUserIDs(ownerUserID).
@@ -290,8 +305,14 @@ func (c *conversationDatabase) SetUserConversations(ctx context.Context, ownerUs
 				DelUserConversationIDsHash(ownerUserID).
 				DelConversationNotReceiveMessageUserIDs(datautil.Slice(notExistConversations, func(e *relationtb.Conversation) string { return e.ConversationID })...)
 		}
-		return cache.ChainExecDel(ctx)
-	})
+		del = cache
+		return nil
+	}); err != nil {
+		return err
+	}
+	// Invalidate after commit, as in groupDatabase.CreateGroup: a read inside the transaction would
+	// cache the old conversation list (a new group member's room missing from it for 12 hours).
+	return del.ChainExecDel(postCommitCtx(ctx))
 }
 
 // func (c *conversationDatabase) FindRecvMsgNotNotifyUserIDs(ctx context.Context, groupID string) ([]string, error) {
@@ -299,7 +320,8 @@ func (c *conversationDatabase) SetUserConversations(ctx context.Context, ownerUs
 //}
 
 func (c *conversationDatabase) CreateGroupChatConversation(ctx context.Context, groupID string, userIDs []string) error {
-	return c.tx.Transaction(ctx, func(ctx context.Context) error {
+	var del cache.ConversationCache
+	if err := c.tx.Transaction(ctx, func(ctx context.Context) error {
 		cache := c.cache.CloneConversationCache()
 		conversationID := msgprocessor.GetConversationIDBySessionType(constant.ReadGroupChatType, groupID)
 		existConversationUserIDs, err := c.conversationDB.FindUserID(ctx, userIDs, []string{conversationID})
@@ -327,8 +349,14 @@ func (c *conversationDatabase) CreateGroupChatConversation(ctx context.Context, 
 		for _, v := range existConversationUserIDs {
 			cache = cache.DelConversations(v, conversationID)
 		}
-		return cache.ChainExecDel(ctx)
-	})
+		del = cache
+		return nil
+	}); err != nil {
+		return err
+	}
+	// Invalidate after commit, as in groupDatabase.CreateGroup: a read inside the transaction would
+	// cache the old conversation list (a new group member's room missing from it for 12 hours).
+	return del.ChainExecDel(postCommitCtx(ctx))
 }
 
 func (c *conversationDatabase) GetConversationIDs(ctx context.Context, userID string) ([]string, error) {
